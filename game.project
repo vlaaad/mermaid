@@ -21,4 +21,8 @@ scale_mode = stretch
 
 [project]
 title = mermaid
+dependencies#0 = https://github.com/defold/extension-automation-bridge/archive/refs/tags/2.5.0.zip
+
+[automation_bridge]
+application_api = 1
 

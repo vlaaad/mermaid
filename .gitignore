@@ -1,6 +1,8 @@
 /.editor_settings
 /.internal
 /build
+/artifacts
+__pycache__/
 .externalToolBuilders
 .DS_Store
 Thumbs.db
