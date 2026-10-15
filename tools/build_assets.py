@@ -74,7 +74,8 @@ class Mesh:
                 a = 2 * math.pi * j / sides
                 radial = math.cos(a) * right * rx + math.sin(a) * front * rz
                 ring.append(p + radial)
-                ns.append(radial / max(np.linalg.norm(radial), 1e-9))
+                outward=math.cos(a)*right/max(rx,1e-6)+math.sin(a)*front/max(rz,1e-6)
+                ns.append(outward / max(np.linalg.norm(outward), 1e-9))
             rings.append(ring)
             normals.append(ns)
         for i in range(len(rings) - 1):
@@ -131,6 +132,7 @@ class Mesh:
         (OUT/f'{name}.glb').write_bytes(struct.pack('<III',0x46546c67,2,12+len(payload))+payload)
         sampler='scene_texture' if category=='blit' else 'caustics'
         texture=f' textures {{ sampler: "{sampler}" texture: "/assets/generated/caustics.png" }}\n'
+        if category!='blit':texture+=' textures { sampler: "stone_detail" texture: "/assets/textures/limestone-v1.png" }\n'
         (OUT/f'{name}.model').write_text(f'mesh: "/assets/generated/{name}.glb"\nmaterials {{\n name: "reef"\n material: "/render/{category}.material"\n{texture}}}\n')
         (OUT/f'{name}.go').write_text(f'components {{ id: "model" component: "/assets/generated/{name}.model" position {{ x:0 y:0 z:0 }} rotation {{x:0 y:0 z:0 w:1}} }}\n')
         STATS[name]={"triangles":len(self.p)//3,"bytes":12+len(payload)}
@@ -139,20 +141,22 @@ class Mesh:
 def make_rock(seed):
     rng = random.Random(seed)
     m=Mesh()
-    angles=[2*math.pi*j/8 for j in range(8)]
-    radial=[rng.uniform(.88,1.14) for _ in angles]
+    # Irregular rectangular strata, chipped edges and uneven caps; shared instances remain editable.
+    outline=[(-.85,-1),(-.25,-1.02),(.75,-1),(1,-.74),(1.02,-.1),(1,.78),(.74,1),(.12,1.03),(-.80,1),(-1,.70),(-1.03,.04),(-1,-.74)]
+    outline=[(x*rng.uniform(.88,1.10),z*rng.uniform(.88,1.10)) for x,z in outline]
     rings=[]
-    for y,s in [(-.5,.75),(-.37,1),(.28,1),(.5,.8)]:
-        rings.append([(math.cos(a)*r*s, y+rng.uniform(-.05,.05), math.sin(a)*r*s) for a,r in zip(angles,radial)])
-    col=(.18,.31,.37)
-    for i in range(3):
-        for j in range(8):
-            jj=(j+1)%8
-            v=rng.uniform(.85,1.12)
+    for level,(y,shrink) in enumerate([(-.5,.90),(-.40,1),(.24,1.01),(.44,.98),(.5,.88)]):
+        rings.append([(x*shrink+rng.uniform(-.035,.035),y+rng.uniform(-.065,.065),z*shrink+rng.uniform(-.035,.035)) for x,z in outline])
+    col=(.18,.31,.44)
+    for i in range(len(rings)-1):
+        for j in range(len(outline)):
+            jj=(j+1)%len(outline)
+            v=rng.uniform(.80,1.16)
             m.quad(rings[i][j],rings[i+1][j],rings[i+1][jj],rings[i][jj],tuple(c*v for c in col))
-    for j in range(8):
-        m.tri((0,.5,0),rings[-1][(j+1)%8],rings[-1][j],(.24,.38,.40))
-        m.tri((0,-.5,0),rings[0][j],rings[0][(j+1)%8],col)
+    for j in range(len(outline)):
+        jj=(j+1)%len(outline)
+        m.tri((.02,.49,-.03),rings[-1][jj],rings[-1][j],(.25,.39,.54))
+        m.tri((0,-.5,0),rings[0][j],rings[0][jj],col)
     return m
 
 
@@ -205,23 +209,38 @@ def ring_ruin():
 
 def kelp():
     m=Mesh()
-    for stalk in range(3):
-        x=R.uniform(-.4,.4); z=R.uniform(-.4,.4); height=R.uniform(3,5.2)
+    rng=random.Random(315)
+    for stalk in range(2):
+        x=rng.uniform(-.18,.18); z=rng.uniform(-.18,.18); height=rng.uniform(4.5,7.0)
         centers=[(x+.13*math.sin(i*.6+stalk),i*height/9,z+.1*math.sin(i*.5)) for i in range(10)]
         m.tube(centers,[.022]*10,(.15,.29,.10),sides=5)
         for side in [-1,1]:
             for leaf in range(6):
                 base=(leaf+.7)*height/9
-                length=R.uniform(.65,1.05)
-                a=R.uniform(-.5,.5)
+                length=rng.uniform(1.05,1.65)
+                a=rng.uniform(-.5,.5)
                 for j in range(3):
                     t0,t1=j/3,(j+1)/3
                     def p(t,s):
-                        breadth=math.sin(t*math.pi)*.23
-                        return (x+side*t*.52+math.sin(base)*.11+s*breadth,base+t*length,z+a*t+math.sin(t*math.pi)*.16+s*breadth*.5)
-                    color=(.21+R.random()*.035,.34+leaf*.008,.08)
+                        breadth=math.sin(t*math.pi)*.12
+                        return (x+side*t*.32+math.sin(base)*.11+s*breadth,base+t*length,z+a*t+math.sin(t*math.pi)*.16+s*breadth*.5)
+                    color=(.21+rng.random()*.035,.34+leaf*.008,.08)
                     uv=[(0,base/height),(1,base/height),(1,(base+length)/height),(0,(base+length)/height)]
                     m.quad(p(t0,-1),p(t0,1),p(t1,1),p(t1,-1),color,uv)
+    return m
+
+
+def ribbon_kelp():
+    m=Mesh()
+    for blade in range(4):
+        angle=blade*1.8
+        length=3.6+blade*.7
+        for j in range(14):
+            def p(t,side):
+                width=math.sin(math.pi*t)*(.22+blade*.045)
+                return (math.sin(t*2.0+angle)*t*.6+side*width,t*length,math.cos(angle)*t*t*.8+side*width*math.sin(t*3+angle))
+            a,b=j/14,(j+1)/14
+            m.quad(p(a,-1),p(a,1),p(b,1),p(b,-1),(.16,.28,.10))
     return m
 
 
@@ -281,8 +300,14 @@ def mermaid():
     m.tube([(0,.89,-.14),(0,1.02,-.18),(0,1.17,-.21)],[(.34,.217),(.39,.224),(.443,.221)],(.075,.40,.40),24)
     m.tube([(0,.88,-.14),(0,.91,-.15)],[(.345,.222),(.353,.223)],(.81,.66,.28),24)
     for side in [-1,1]:
-        m.tube([(side*.4,1.22,-.22),(side*.63,.95,-.23),(side*.8,.59,-.32),(side*1.02,.28,-.53)],[.14,.13,.095,.065],skin,14)
-        m.ellipsoid((side*1.055,.18,-.56),(.10,.18,.065),skin,8,12)
+        wrist=(side*(1.48 if side<0 else 1.30),.56 if side<0 else .28,-.53)
+        m.tube([(side*.4,1.22,-.22),(side*.72,1.04,-.19),(side*1.03,.82 if side<0 else .65,-.32),wrist],[.14,.13,.095,.065],skin,14)
+        palm=(wrist[0]+side*.045,wrist[1]-.10,wrist[2]-.02)
+        m.ellipsoid(palm,(.10,.14,.060),skin,8,12)
+        for finger in range(4):
+            x=palm[0]+(finger-1.5)*.045
+            length=.10+.035*math.sin((finger+.5)*math.pi/4)
+            m.tube([(x,palm[1]-.08,palm[2]),(x+side*.018,palm[1]-.08-length,palm[2]-.03)],[.023,.014],skin,6)
         # Gold shoulder clasp and thin strap.
         m.tube([(side*.31,1.08,-.01),(side*.33,1.38,-.19),(side*.32,1.15,-.43)],[.026,.026,.026],(.77,.63,.28),8)
     tail_centers=[(0,.16,.05),(0,-.18,.17),(-.05,-.56,.43),(-.13,-.96,.72),(-.20,-1.32,1.03),(-.25,-1.63,1.32),(-.25,-1.86,1.57)]
@@ -294,23 +319,25 @@ def mermaid():
                 return (-.25+side*(.08+u*.92)*v,-1.80-v*(.55+.62*math.sin(u*math.pi*.85)),1.58+v*(.22+.35*u))
             for j in range(6):
                 v0,v1=j/6,(j+1)/6
-                col=(.30+.25*v1,.77+.10*v1,.61+.10*v1)
+                col=(.22+.32*v1,.72+.13*v1,.61-.20*v1)
                 m.quad(fin(u0,v0),fin(u1,v0),fin(u1,v1),fin(u0,v1),col)
-            m.tube([fin((u0+u1)/2,v) for v in [0,.25,.5,.75,1]],[.008]*5,(.56,.87,.68),5)
+            m.tube([fin((u0+u1)/2,v) for v in [0,.25,.5,.75,1]],[.008]*5,(.56,.85,.50),5)
     # Sculpted cap and tapered locks streaming backward in the water.
     m.ellipsoid((0,2.04,-.16),(.335,.335,.29),(.79,.51,.19),12,24)
     # Separate undulating locks have open silhouettes instead of a solid ponytail cone.
+    m.tube([(0,2.0,.00),(0,1.8,.01),(-.13,1.60,.14),(-.33,1.45,.26),(-.57,1.26,.50)],[(.29,.16),(.31,.17),(.28,.15),(.24,.12),(.02,.02)],(.82,.59,.25),18)
     hair_rng=random.Random(184)
     for strand in range(46):
-        a=math.tau*strand/46
+        a=hair_rng.random()*math.tau
+        phase=hair_rng.random()*math.tau
         root=(math.cos(a)*.26,2.12+math.sin(a)*.15,-.08+math.sin(a)*.13)
         length=hair_rng.uniform(1.15,2.15)
         centers=[]
         for j in range(13):
             t=j/12
-            centers.append((root[0]-t*.80-math.sin(t*math.pi/2)*length*.30+math.sin(t*7+a)*.24*t,
-                            root[1]-t*length*.72+math.sin(t*8+a)*.25*t,
-                            root[2]+t*length*.58+math.cos(t*6+a)*.12*t))
+            centers.append((root[0]-t*.80-math.sin(t*math.pi/2)*length*.30+math.sin(t*5+phase)*.19*t,
+                            root[1]-t*length*.72+math.sin(t*6+phase)*.25*t,
+                            root[2]+t*length*.58+math.sin(t*8+phase)*.18*t))
         shade=hair_rng.uniform(.86,1.14)
         width=.13 if strand%3==0 else .042
         m.tube(centers,[(width*(1-j/12)**.65+.002,.060*(1-j/12)+.002) for j in range(13)],(.91*shade,.67*shade,.28*shade),7)
@@ -321,11 +348,19 @@ def mermaid():
 
 def main():
     OUT.mkdir(parents=True,exist_ok=True)
+    settings=json.loads((ROOT/'assets/art.json').read_text())
+    def lua(value):
+        if isinstance(value,dict):return '{'+','.join(k+'='+lua(v) for k,v in value.items())+'}'
+        if isinstance(value,list):return '{'+','.join(lua(v) for v in value)+'}'
+        return json.dumps(value)
+    (ROOT/'main/art.lua').write_text('-- Generated from assets/art.json; edit that source.\nreturn '+lua(settings)+'\n')
     for i in range(4): make_rock(100+i).save(f'rock{i}')
     column().save('column')
     arch().save('arch')
     ring_ruin().save('ring')
     kelp().save('kelp','kelp')
+    for _ in range(189):R.random()
+    ribbon_kelp().save('ribbon_kelp','kelp')
     coral((.56,.27,.51),True).save('sponge','stone')
     coral((.84,.39,.41)).save('coral_pink','stone')
     coral((.28,.39,.72)).save('coral_blue','stone')
@@ -340,9 +375,9 @@ def main():
         for x in range(-60,61,4):
             def p(xx,zz): return (xx,-.25+.13*math.sin(xx*.3)*math.cos(zz*.19),zz)
             ground.quad(p(x,z),p(x,z+4),p(x+4,z+4),p(x+4,z),(.28,.52,.53))
-    ground.save('seabed')
+    ground.save('seabed','sand')
     surface=Mesh()
-    surface.quad((-130,26,35),(130,26,35),(130,26,-180),(-130,26,-180),(.12,.64,.83))
+    surface.quad((-130,48,35),(130,48,35),(130,48,-230),(-130,48,-230),(.12,.64,.83))
     surface.save('surface','surface')
     particle=Mesh()
     particle.ellipsoid((0,0,0),(.025,.025,.025),(.38,.74,.80),3,4)
@@ -354,6 +389,10 @@ def main():
     # Seamless cellular caustics. One shared texture, two scrolling samples per pixel.
     rng=np.random.default_rng(73)
     yy,xx=np.mgrid[0:256,0:256]/256*7
+    # Periodic refraction warp bends cellular edges into flowing caustic ribbons.
+    xx0,yy0=xx.copy(),yy.copy()
+    xx=(xx0+.24*np.sin(yy0*math.tau/7*3+.4*np.sin(xx0*math.tau/7*2))+.10*np.sin(yy0*math.tau/7*5))%7
+    yy=(yy0+.22*np.sin(xx0*math.tau/7*2+.5*np.cos(yy0*math.tau/7*3)))%7
     nearest=np.full((256,256),1e6); second=nearest.copy()
     for i in range(7):
         for j in range(7):
@@ -386,18 +425,34 @@ def main():
             for j in range(22):
                 a=(j+.5)*math.tau/22
                 obstacles.append([p[0]+math.cos(a)*4.05*scale[0],p[1]+math.sin(a)*4.05*scale[1],p[2],.62*scale[0],.62*scale[1],.55*scale[2]])
+    def at_screen(u,v,z):
+        # Authoring aid only: emit a fixed 3D coordinate. No runtime camera-facing backdrop.
+        root=np.array([-1,4.8,4.0]);pitch=-.04
+        eye=root+np.array([settings['eye_right'],settings['eye_height']-math.sin(pitch)*settings['camera_distance'],math.cos(pitch)*settings['camera_distance']])
+        target=root+np.array([settings['look_right'],settings['look_height']+math.sin(pitch)*16,-16])
+        forward=target-eye;forward/=np.linalg.norm(forward)
+        right=np.cross(forward,[0,1,0]);right/=np.linalg.norm(right)
+        up=np.cross(right,forward)
+        ray=forward+right*((u-.5)*2*math.tan(math.radians(59)/2)*16/9)+up*((.5-v)*2*math.tan(math.radians(59)/2))
+        return tuple(eye+ray*((z-eye[2])/ray[2]))
     place('seabed',(0,0,0))
     place('surface',(0,0,0))
     # Terraces of broad weathered rock frame a navigable central canyon.
+    dense=settings.get('dense_terrain',False)
     for side in [-1,1]:
-        for tier in range(4):
-            for k in range(15):
-                z=12-k*7+R.uniform(-1.8,1.8)
-                x=side*(12+tier*4+2*math.sin(z*.12)) if side>0 else -(10+tier*3+2*math.sin(z*.12))
+        for tier in range(6 if dense else 4):
+            for k in range(26 if dense else 15):
+                z=12-k*(4.2 if dense else 7)+R.uniform(-.8,.8)
+                x=side*(12+tier*(3 if dense else 4)+2*math.sin(z*.12)) if side>0 else -(10+tier*(2.4 if dense else 3)+2*math.sin(z*.12))
                 if side==1:x+=1.8
-                y=tier*(3.1 if side>0 else 3.8)+R.uniform(-.2,.3)
-                scale=(R.uniform(3.2,5.5),R.uniform(2.6,4.4),R.uniform(3.0,5.3))
+                y=tier*((3.0 if side>0 else 2.7) if dense else (4.4 if side>0 else 3.8))+R.uniform(-.2,.3)
+                scale=(R.uniform(2.0,3.2),R.uniform(2.0,3.1),R.uniform(1.8,3.1)) if dense else (R.uniform(3.2,5.5),R.uniform(2.6,4.4),R.uniform(3.0,5.3))
                 place(f'rock{R.randrange(4)}',(x,y,z),scale,R.uniform(-.28,.28),True)
+                if tier>0:
+                    height=y+scale[1]*.5+.6
+                    place(f'rock{(tier+k)%4}',(x,y-height*.5,z),(scale[0]*.91,height,scale[2]*.91),0,True)
+                if dense and tier>3 and k<18 and R.random()<.30:
+                    place('kelp',(x,y+scale[1]*.5,z),R.uniform(.75,1.15),R.random()*math.tau)
                 if tier<3 and k<11:
                     for _ in range(2):
                         place('kelp',(x+R.uniform(-2,2),y+scale[1]*.45,z+R.uniform(-2,2)),R.uniform(.65,1.3),R.random()*math.tau)
@@ -420,27 +475,65 @@ def main():
                 x=side*14
                 z-=8
                 scale=(scale[0],1.25,scale[2])
-            if not (side==1 and k in (0,1)):place('column',(x,base,z),scale,0)
+            if not (side==1 and k in (0,1,2)):place('column',(x,base,z),scale,0)
     place('rock1',(2,.65,-15),(1.6,1.9,1.3),.3,True)
     place('rock2',(-2,.35,-23),(2.1,1.1,1.4),-.2,True)
     place('column',(4.8,0,-26),(.55,.42,.55))
-    place('arch',(0,1.5,-30),(1.05,1.05,1.05))
-    place('arch',(18,5,-43),(2.4,2.4,2.2))
-    place('ring',(18,20.2,-44),(1.25,1.25,1.25))
+    place('arch',(4.8,1.5,-45),(.9,.9,.9))
+    place('arch',(21,4,-43),(2.35,1.55,2))
+    place('ring',(22,21.6,-44),(1.15,1.15,1.15))
+    for side in [-1,1]:
+        place('column',(22+side*6.6,13.0,-44),(1.1,1.7,1.1))
+        place('rock2',(22+side*6.5,18.5,-44),(1.5,10.5,1.5),0,True)
+    place('rock1',(22,27,-44),(7.5,1.0,1.6))
     place('arch',(-13,5,-68),(2,2,2))
-    place('column',(23,0,-54),(1.8,3.5,1.8))
-    place('column',(31,0,-54),(1.8,3.5,1.8))
-    place('rock0',(27,29.2,-54),(6,.9,2.5))
+    place('column',(9.4,10,-43),(1.25,2.25,1.25))
+    place('rock0',(9.4,7,-43),(3,6,3),0,True)
+    place('column',(-8.6,3,-40),(1.1,1.7,1.1))
+    for layer in range(6):
+        for part in [-1,1]:
+            place(f'rock{(layer+part)%4}',(-34+part*3.0,14+layer*3.2,-50),(3.4,3.0,3.8),part*.08,True)
+    place('rock0',(29.5,29.3,-54),(7,.9,3.5))
+    place('column',(25.5,30,-54),(1.5,1.9,1.5))
+    place('column',(33.5,30,-54),(1.5,1.9,1.5))
+    place('rock0',(29.5,45.8,-54),(7,.75,2.8))
+    # Broken column bases and interlocking floor terraces leave a swimming route at X=-1.
+    place('column',(1.7,-5.2,0),(.85,1.0,.85))
+    for asset,pos,scale in [
+        ('rock1',(2.5,.8,-3),(2.0,2.0,1.8)),
+        ('rock2',(3.5,.9,-8),(2.4,2.7,2.1)),
+        ('rock0',(3.5,2.5,-8),(1.4,1.4,1.4)),
+        ('rock3',(-4.5,1.4,-9),(2.5,3.4,2.8)),
+        ('rock1',(-4.4,3.7,-10),(2.0,1.4,2.0)),
+        ('rock2',(1.8,.9,-20),(2.1,2.4,2.2)),
+        ('rock0',(5.2,2.1,-24),(2.6,4.5,2.3)),
+        ('rock1',(-2,1.4,-32),(2.0,3.3,2.0))]:
+        place(asset,pos,scale,.15,True)
+    place('sponge',(3.2,2,-3),1.0)
+    place('coral_pink',(-4.5,4.2,-9),.9)
+    place('kelp',(6.5,2.5,-10),1.0,.3)
     # Sun shafts are integrated through water in the depth-aware post process.
     # Preserve RNG stream so this renderer change does not reshuffle the fish.
     for _ in range(8):R.uniform(1.2,2)
     # Shared fish geometry/material => one instanced batch per visible mesh.
-    for school in range(5):
-        cx,cy,cz=[(-7,8,-14),(2,10,-34),(10,4,-11),(-7,3,0),(13,9,-54)][school]
+    for school in [1,2,4]:
+        cx,cy,cz=[(-7,8,-14),(3.8,16,-40),(10,4,-11),(-7,3,0),(13,9,-54)][school]
         for k in range(50 if school in [1,4] else 10):
             place('fish_blue' if school in [1,4] else 'fish',(cx+R.gauss(0,2.2),cy+R.gauss(0,.7),cz+R.gauss(0,1.5)),R.uniform(.45,.8) if school in [1,4] else R.uniform(.8,1.4),.1*school)
-    place('ray',(-6,15,-18),1.5,-.5)
-    place('ray',(2.5,16,-39),1.1,.3)
+    for k,(u,v,scale) in enumerate([(.10,.42,.46),(.055,.47,.64),(.15,.46,.47),(.13,.52,.43),(.06,.54,.40)]):
+        p=list(at_screen(u,v,5.5))
+        # Compensate the known opening-time local drift; these remain independent fish GOs.
+        yaw=0 if k%3 else math.pi
+        p[0]-=math.sin(3*.18+5.5*.12)*1.1*scale*math.cos(yaw)
+        p[1]-=math.sin(3*.8+5.5)*.12*scale
+        place('fish',p,scale,yaw)
+    place('ray',at_screen(.33,.16,-18),2.2,-.5)
+    place('ray',at_screen(.47,.23,-39),1.5,.3)
+    place('ribbon_kelp',at_screen(.08,1.10,5),1.0,.3)
+    place('sponge',at_screen(.94,.98,5),.85)
+    place('coral_pink',at_screen(.98,.77,4),1.1)
+    place('coral_pink',at_screen(.28,.80,2),1.0)
+    place('sponge',at_screen(.10,.95,2),.70)
     for k in range(65):place('particle',(R.uniform(-15,15),R.uniform(1,22),R.uniform(-55,10)),R.uniform(.5,1.6))
     # Remove only obsolete outputs from the abandoned mesh-baking experiment.
     for stale in list(OUT.glob('ruins_chunk_*')) + [OUT/(n+ext) for n in ('fish_field','fish_blue_field','dust_field') for ext in ('.glb','.model','.go')]:

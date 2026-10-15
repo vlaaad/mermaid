@@ -1,0 +1,2 @@
+-- Generated from assets/art.json; edit that source.
+return {camera_distance=9,eye_height=1.5,eye_right=0.342,look_right=0.65,look_height=1.48,player_scale=0.728,player_tilt=-0.6,player_bank=-0.12,ambient_top={0.17279999999999998,0.3808,0.5907999999999999},ambient_bottom={0.36920000000000003,0.5292,0.4248},sun_color={0.7807999999999998,0.7307999999999998,0.5307999999999998},fog_top={0.038,0.438,0.7779999999999998},fog_bottom={0.10500000000000001,0.4168,0.702},fog_density=0.04024,caustics_strength=0.48,water_color={0.3,0.54,0.74},water_strength=0.066,dense_terrain=true}

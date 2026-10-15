@@ -5,11 +5,24 @@ local function target(w,h,depth_texture)
     })
 end
 
+local function apply_art(self,settings)
+    local function rgb(key,w) local v=settings[key] return vmath.vector4(v[1],v[2],v[3],w or 0) end
+    self.constants.art_ambient_top=rgb("ambient_top",settings.caustics_strength)
+    self.constants.art_ambient_bottom=rgb("ambient_bottom")
+    self.constants.art_sun=rgb("sun_color")
+    self.constants.art_fog_bottom=rgb("fog_bottom")
+    self.constants.fog_settings=rgb("fog_top",settings.fog_density)
+    self.constants.art_water=rgb("water_color",settings.water_strength)
+end
+
 function init(self)
     self.opaque=render.predicate({"reef"})
     self.casters={}
     for _,category in ipairs({0,1,2,3,6}) do self.casters[category]=render.predicate({"caster"..category}) end
     self.shadow_constants=render.constant_buffer()
+    self.depth_constants=render.constant_buffer()
+    self.depth_predicates={}
+    for _,category in ipairs({0,1,2,3,6,7}) do self.depth_predicates[category]=render.predicate({"depth"..category}) end
     self.text=render.predicate({"text"})
     self.blit=render.predicate({"blit"})
     self.view=vmath.matrix4_look_at(vmath.vector3(0,7,13),vmath.vector3(0,6,-13),vmath.vector3(0,1,0))
@@ -17,8 +30,8 @@ function init(self)
     self.constants.visual_debug=vmath.vector4()
     self.constants.time_data=vmath.vector4(3,0,0,0)
     self.constants.camera_pos=vmath.vector4(0,7,13,1)
-    self.constants.fog_settings=vmath.vector4(.07,.52,.76,.024)
-    self.shadow=target(1024,1024,true)
+    apply_art(self,require "main.art")
+    self.shadow=target(2048,2048,true)
 end
 
 function update(self)
@@ -36,37 +49,65 @@ function update(self)
         self.rw,self.rh=rw,rh
     end
     local camera=self.constants.camera_pos
-    local center=vmath.vector3(math.floor(camera.x/2)*2,0,math.floor((camera.z-30)/2)*2)
+    -- Fixed extent and light-space texel snapping keep shadows stable during swimming.
+    local center=vmath.vector3(camera.x,0,camera.z-25)
     local sun=vmath.normalize(vmath.vector3(.35,.90,-.24))
-    local light_view=vmath.matrix4_look_at(center+sun*100,center,vmath.vector3(0,0,1))
-    local light_proj=vmath.matrix4_orthographic(-60,60,-65,65,1,180)
+    local basis=vmath.matrix4_look_at(sun,vmath.vector3(),vmath.vector3(0,0,1))
+    local c=basis*vmath.vector4(center.x,center.y,center.z,1)
+    c.x=math.floor(c.x/(100/2048))*(100/2048)
+    c.y=math.floor(c.y/(100/2048))*(100/2048)
+    local snapped=vmath.inv(basis)*c
+    center=vmath.vector3(snapped.x,snapped.y,snapped.z)
+    local light_view=vmath.matrix4_look_at(center+sun*80,center,vmath.vector3(0,0,1))
+    local light_proj=vmath.matrix4_orthographic(-50,50,-50,50,1,150)
     self.constants.light_matrix=light_proj*light_view
     render.set_depth_mask(true)
     render.enable_state(graphics.STATE_DEPTH_TEST)
     render.disable_state(graphics.STATE_CULL_FACE)
     render.disable_state(graphics.STATE_BLEND)
     render.set_render_target(self.shadow)
-    render.set_viewport(0,0,1024,1024)
+    render.set_viewport(0,0,2048,2048)
     render.clear({[graphics.BUFFER_TYPE_COLOR0_BIT]=vmath.vector4(1),[graphics.BUFFER_TYPE_DEPTH_BIT]=1})
     render.set_view(light_view)
     render.set_projection(light_proj)
     render.enable_material("shadow")
     self.shadow_constants.time_data=self.constants.time_data
     for _,category in ipairs({0,1,2,3,6}) do
+        -- Closed stone volumes cast their back faces: no striped self-shadow on broad ledges.
+        -- Thin leaves and animated fins remain double-sided casters.
+        if category==0 then
+            render.enable_state(graphics.STATE_CULL_FACE)
+            render.set_cull_face(graphics.FACE_TYPE_FRONT)
+        else render.disable_state(graphics.STATE_CULL_FACE) end
         self.shadow_constants.params=vmath.vector4(category,0,0,0)
         render.draw(self.casters[category],{constants=self.shadow_constants,frustum=self.constants.light_matrix})
     end
     render.disable_material()
+    render.disable_state(graphics.STATE_CULL_FACE)
 
     render.set_render_target(self.target)
-    render.clear({[graphics.BUFFER_TYPE_COLOR0_BIT]=vmath.vector4(.055,.43,.66,1),[graphics.BUFFER_TYPE_DEPTH_BIT]=1})
+    local fog=self.constants.fog_settings
+    render.clear({[graphics.BUFFER_TYPE_COLOR0_BIT]=vmath.vector4(fog.x,fog.y,fog.z,1),[graphics.BUFFER_TYPE_DEPTH_BIT]=1})
     render.set_viewport(0,0,rw,rh)
     render.set_view(self.view)
     local projection=vmath.matrix4_perspective(math.rad(59),w/h,.15,180)
     render.set_projection(projection)
-    render.enable_texture("sun_depth",self.shadow,graphics.BUFFER_TYPE_DEPTH_BIT)
-    render.draw(self.opaque,{constants=self.constants,frustum=projection*self.view})
+    -- Resolve nearest surfaces cheaply before the texture/PCF-heavy material pass.
+    render.set_color_mask(false,false,false,false)
+    render.enable_material("depth")
+    self.depth_constants.time_data=self.constants.time_data
+    for _,category in ipairs({0,1,2,3,6,7}) do
+        self.depth_constants.params=vmath.vector4(category,0,0,0)
+        render.draw(self.depth_predicates[category],{constants=self.depth_constants,frustum=projection*self.view,sort_order=render.SORT_FRONT_TO_BACK})
+    end
+    render.disable_material()
+    render.set_color_mask(true,true,true,true)
+    render.set_depth_func(graphics.COMPARE_FUNC_LEQUAL)
     render.set_depth_mask(false)
+    render.enable_texture("sun_depth",self.shadow,graphics.BUFFER_TYPE_DEPTH_BIT)
+    render.draw(self.opaque,{constants=self.constants,frustum=projection*self.view,sort_order=render.SORT_FRONT_TO_BACK})
+    render.set_depth_mask(false)
+    render.set_depth_func(graphics.COMPARE_FUNC_LESS)
     render.disable_state(graphics.STATE_DEPTH_TEST)
     self.constants.inverse_view_projection=vmath.inv(projection*self.view)
     self.constants.screen_size=vmath.vector4(rw,rh,math.ceil(rw/4),math.ceil(rh/4))
@@ -93,6 +134,7 @@ function update(self)
 end
 
 function on_message(self,id,message)
+    if id==hash("art_settings") then apply_art(self,message) end
     if id==hash("lighting_debug") then self.constants.visual_debug=vmath.vector4(message.mode,0,0,0) end
     if id==hash("scene_camera") then
         self.view=message.view

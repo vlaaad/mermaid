@@ -4,6 +4,7 @@ local function smooth(rate,dt) return 1-math.exp(-rate*dt) end
 local function wrap(a) return (a+math.pi)%(math.pi*2)-math.pi end
 
 local function reset(self,freeze)
+    self.art=self.art or require "main.art"
     self.position=vmath.vector3(-1,4.8,4)
     self.velocity=vmath.vector3()
     self.yaw=0
@@ -84,6 +85,12 @@ function init(self)
         automation_bridge.command("mermaid.reset",function(data) reset(self,data.freeze~=false) return state(self) end)
         automation_bridge.command("mermaid.capture",function() reset(self,true) return state(self) end)
         automation_bridge.command("mermaid.lighting",function(data) msg.post("@render:","lighting_debug",{mode=tonumber(data.mode) or 0}) return {mode=data.mode or 0} end)
+        automation_bridge.command("mermaid.art",function(data)
+            for key,value in pairs(data) do if self.art[key]~=nil then self.art[key]=value end end
+            msg.post("@render:","art_settings",self.art)
+            reset(self,true)
+            return self.art
+        end)
         automation_bridge.command("mermaid.resume",function() self.frozen=false return state(self) end)
         automation_bridge.describe("command","mermaid.capture",{description="Reset opening camera, player pose, seed-dependent scene, and animation time; freeze until input or resume."})
     end
@@ -92,7 +99,7 @@ end
 
 function update(self,dt)
     local raw_dt=dt
-    dt=math.min(dt,.05)
+    dt=math.min(dt,.1)
     self.frames=self.frames+1
     self.frame_ms=self.frame_ms+(raw_dt*1000-self.frame_ms)*.06
     local k=self.keys
@@ -110,7 +117,8 @@ function update(self,dt)
     local input=vmath.length_sqr(desired)>0
     self.velocity=vmath.lerp(smooth(input and 4.5 or 3.4,dt),self.velocity,desired*target_speed)
     if vmath.length_sqr(self.velocity)>.0001 then
-        self.position=resolve(self.position+self.velocity*dt)
+        local steps=math.max(1,math.ceil(dt/.025))
+        for _=1,steps do self.position=resolve(self.position+self.velocity*(dt/steps)) end
     else self.velocity=vmath.vector3() end
     self.speed=vmath.length(self.velocity)
     if input and (forward~=0 or side~=0) then
@@ -119,12 +127,13 @@ function update(self,dt)
     end
     if not self.frozen then self.time=self.time+dt end
     local bank=side*-.16
-    local tilt=-.45+forward*.08-vertical*.14
+    local tilt=self.art.player_tilt+forward*.08-vertical*.14
     go.set_position(self.position+vmath.vector3(0,math.sin(self.time*1.4)*.035,0),"/player")
-    go.set_rotation(vmath.quat_rotation_y(self.heading)*vmath.quat_rotation_z(bank-.12)*vmath.quat_rotation_x(tilt),"/player")
-    go.set_scale(.85,"/player")
-    local offset=vmath.vector3(math.sin(self.yaw)*9*math.cos(self.pitch),1.36-math.sin(self.pitch)*9,math.cos(self.yaw)*9*math.cos(self.pitch))
-    local desired_camera=self.position+offset+vmath.vector3(1,0,0)
+    go.set_rotation(vmath.quat_rotation_y(self.heading)*vmath.quat_rotation_z(bank+self.art.player_bank)*vmath.quat_rotation_x(tilt),"/player")
+    go.set_scale(self.art.player_scale,"/player")
+    local distance=self.art.camera_distance
+    local offset=vmath.vector3(math.sin(self.yaw)*distance*math.cos(self.pitch),self.art.eye_height-math.sin(self.pitch)*distance,math.cos(self.yaw)*distance*math.cos(self.pitch))
+    local desired_camera=self.position+offset+vmath.vector3(self.art.eye_right,0,0)
     desired_camera.y=math.max(.8,desired_camera.y)
     -- Broad phase plus an exact expanded-AABB segment test. Cache stationary arms.
     local anchor=self.position+vmath.vector3(0,1,0)
@@ -147,7 +156,7 @@ function update(self,dt)
         self.camera_cache={position=self.position,yaw=self.yaw,pitch=self.pitch,camera=desired_camera}
     end
     self.camera=self.frozen and desired_camera or vmath.lerp(smooth(5,dt),self.camera,desired_camera)
-    local look=self.position+vmath.vector3(.65,1.1,0)+vmath.vector3(-math.sin(self.yaw)*16,math.sin(self.pitch)*16,-math.cos(self.yaw)*16)
+    local look=self.position+vmath.vector3(self.art.look_right,self.art.look_height,0)+vmath.vector3(-math.sin(self.yaw)*16,math.sin(self.pitch)*16,-math.cos(self.yaw)*16)
     local view=vmath.matrix4_look_at(self.camera,look,vmath.vector3(0,1,0))
     msg.post("@render:","scene_camera",{view=view,position=vmath.vector4(self.camera.x,self.camera.y,self.camera.z,1),time_data=vmath.vector4(self.time,self.speed,0,0)})
     self.publish_timer=self.publish_timer+dt
