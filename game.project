@@ -1,13 +1,18 @@
 [bootstrap]
 main_collection = /main/main.collectionc
+render = /render/underwater.renderc
 
 [script]
 shared_state = 1
 
 [display]
-width = 960
-height = 640
-high_dpi = 1
+width = 1280
+height = 720
+high_dpi = 0
+update_frequency = 60
+
+[engine]
+run_while_iconified = 1
 
 [android]
 input_method = HiddenInputField
@@ -17,7 +22,16 @@ gravity_y = -1000.0
 scale = 0.01
 
 [html5]
-scale_mode = stretch
+scale_mode = fit
+htmlfile = /web/index.html
+show_fullscreen_button = 0
+show_made_with_defold = 0
+
+[collection]
+max_instances = 2048
+
+[model]
+max_count = 1024
 
 [project]
 title = mermaid

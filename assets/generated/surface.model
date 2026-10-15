@@ -1,0 +1,6 @@
+mesh: "/assets/generated/surface.glb"
+materials {
+ name: "reef"
+ material: "/render/surface.material"
+ textures { sampler: "caustics" texture: "/assets/generated/caustics.png" }
+}

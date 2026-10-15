@@ -1,2 +1,27 @@
 name: "main"
 scale_along_z: 0
+collection_instances {
+  id: "reef"
+  collection: "/main/world.collection"
+  position {x:0 y:0 z:0}
+  rotation {x:0 y:0 z:0 w:1}
+  scale: 1
+}
+embedded_instances {
+  id: "controller"
+  data: "components { id: \"controller\" component: \"/main/main.script\" position {x:0 y:0 z:0} rotation {x:0 y:0 z:0 w:1} }\n"
+  position {x:0 y:0 z:0}
+  rotation {x:0 y:0 z:0 w:1}
+}
+instances {
+  id: "player"
+  prototype: "/assets/generated/mermaid.go"
+  position {x:-1 y:4.8 z:4}
+  rotation {x:0 y:0 z:0 w:1}
+}
+instances {
+  id: "fullscreen"
+  prototype: "/assets/generated/fullscreen.go"
+  position {x:0 y:0 z:0}
+  rotation {x:0 y:0 z:0 w:1}
+}

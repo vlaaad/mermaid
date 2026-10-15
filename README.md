@@ -1,193 +1,109 @@
-# Mermaid
+# Agent working memory — Mermaid
 
-Defold project for a third-person underwater exploration scene inspired by
-`Blonde-Mermaid-in-Atlantis-Ruins.png`. Scene content is currently empty.
+## Objective and constraints
+- Build the actual controllable 3D scene as close as practical to `Blonde-Mermaid-in-Atlantis-Ruins.png`.
+- Desktop + browser, keyboard/mouse. 30 FPS is sufficient on this old laptop. Prioritize reference look and feel; use profiling to catch regressions, not chase 60 FPS. Share/instance meshes; NEVER bake fish, rays, vegetation, or other future actors into scenery.
+- README is agent memory: maintain concrete state, commands, pitfalls, measurements, and next work as the project evolves. Do not rewrite as marketing/user documentation.
+- User authorizes local Git commits. Repository now exists; user supplied initial/prep commits b090512 and 2a54da5. Preserve their work and commit our scene separately.
+- Do not flatten the reference into a backdrop to improve the diff. The opening frame must come from the playable 3D world.
 
-## Development setup
+## Environment / access
+- CWD `/home/vlaaad/Projects/mermaid`; running Defold 1.14.0 at `http://127.0.0.1:$(cat .internal/editor.port)`.
+- `.internal/editor.token` is a secret local bearer token for `/eval` and `/bob`; do not print it.
+- Running editor HTTP + engine + Blender Snap require unsandboxed execution here. Use `exec_command` escalation for these; don't launch another editor unnecessarily.
+- Blender 5.2.2 LTS: `/snap/bin/blender` works outside sandbox. Meshes are glTF/GLB and editable there.
+- Official builtins/shaders and protobuf classes are in `/opt/Defold/packages/defold-a81dbb0478e8b73931dc2d671563204f6ac0ef82.jar`. Read the installed source/schema first instead of guessing APIs.
+- System Python includes Pillow + NumPy. No SciPy/skimage needed by project tools.
 
-- Defold editor is running and reachable through `.internal/editor.port`.
-- Automation Bridge is pinned to release **2.5.0** in `game.project`, with its
-  matching dependency-free Python wrapper in `automation-bridge-python/`.
-- The optional application API is enabled for future player/camera state,
-  reset commands, and input acknowledgements. Guard Lua calls with
-  `if automation_bridge then ... end` because the bridge is debug-only.
-- Python 3 and Blender **5.2.2 LTS** are installed and verified. Blender's Snap
-  launcher requires execution outside the restricted agent sandbox.
+## Current implementation (update after verification)
+- `tools/build_assets.py`: deterministic seed 73 geometry/layout generator. Y-up, meters, forward -Z. Emits vertex-colored GLBs, `.model`/`.go` resources, `main/world.collection`, `main/obstacles.lua`, and `assets/generated/manifest.json`.
+- Geometry authored procedurally: 4 shared rock variants, fluted column, segmented arch, circular ruin, kelp cluster, coral/sponges, fish/ray, mermaid, seabed, surface, particles.
+- Current generated world instances + player are recorded in `assets/generated/manifest.json` (vegetation/fish geometry reduced after profiling). Broad cliffs are instanced rocks; fish and kelp share meshes/materials. Static indexed primitives are not required; current generated GLBs use explicit triangles.
+- `render/underwater.*`: perspective custom render pass, local-space instanced world-matrix shader, vertex colors, per-category vertex animation, shared cellular caustics texture, soft sun shadows, hemisphere/sand bounce fill, depth fog, and depth-aware volumetric water (no shaft cards).
+- `main/main.script`: inertial swimming, camera-relative WASD, rise Space/E, dive Ctrl/Q, Shift boost, mouse drag orbit, R reset, P profiler; sphere/AABB sliding and a broad-phase-filtered segment/AABB camera arm test with stationary caching. Architecture is collidable (197 terrain/column/arch/ring boxes).
+- Display 1280x720, high_dpi=0 to avoid uncontrolled DPR cost. Scene uses perspective 59deg vertical FOV.
+- Scene renders on native and WebGL. Do not call it a close art match yet: mermaid art, rock variation, and composition remain visibly simpler than reference.
 
-Keep the editor open on this project. From the project root:
-
-```sh
-# Build and launch, then capture the native game.
-python3 tools/automation.py --build
-
-# Attach to the running native game, send input, and capture afterward.
-python3 tools/automation.py --key W --hold 0.5 --click 200 200
-
-# Focus the game during timing-sensitive movement tests.
+## Run / capture / inspect
+```
+python3 tools/build_assets.py
 python3 tools/automation.py --build --focus --key W --hold 0.5
-
-# Capture main-thread timings, counters, and resource sizes in latest.json.
-python3 tools/automation.py --build --focus --profile 60
+python3 tools/automation.py --build --focus --profile 120 --scale 1
 ```
+- Wrapper: pinned Automation Bridge 2.5.0; copied managed `automation-bridge-python/`. Do not edit wrapper or store game code there. Import only package-root `editor`, `engine`.
+- Reuse editor: `PYTHONPATH=automation-bridge-python python3 ...`; `p=editor.open_project('.',start_if_needed=False)`.
+- Manually authored `.go`/`.collection` must be parsed via `p.preview.render(resource, resolution_multiplier=.5)` before building; native runtime is still the visual truth.
+- `g=p.build_and_run(focus=True,timeout=180)`; screenshots atomic: `shot=g.screenshot(after_frames=2)`; save `shot.read_bytes()`.
+- Use focus=True for profiler/control timings. Initial native graphics warmup/occlusion can throttle frames. `engine.run_while_iconified=1` is set; initial ready timeout45sec accounts for shader/OS warmup. Close the browser game while profiling native, and close native while profiling browser.
+- `g.close()` releases this client and leaves the engine running; `g.close_engine()` terminates it. Do not close an engine used by another session.
+- `g.command('mermaid.capture',{})` resets opening pose/camera/time=3 and freezes animation; `mermaid.resume` resumes. `mermaid.reset` takes `{freeze:bool}`. Any movement unfreezes.
+- `g.state('mermaid')` exposes ready, frozen, time, speed, position, camera, heading input, frame count and smoothed frame_ms. Guard Lua APIs with `if automation_bridge then`.
+- Current images: `artifacts/scene/opening.png` (authored scene), `artifacts/automation/latest.png` + `latest.json` (generic helper).
 
-The helper saves `artifacts/automation/latest.png` and `latest.json`, including
-native input receipts, health/capabilities, frame IDs, and capture metadata. It
-leaves the game running. Coordinates use top-left window pixels; high-DPI
-window dimensions may differ from configured project dimensions. Screenshots
-default to half resolution; use `--scale 1` for full resolution. An unfocused
-game may throttle frames, so use the focused build for control timing checks.
-Agent sandbox restrictions may require escalation for local editor/engine HTTP.
-
-Verified on 2026-10-15: Defold 1.14.0 built and launched the empty project with
-the extension, captured a runtime PNG, and completed W-key and mouse-click
-input with `released` receipts. The empty scene has no gameplay input handler;
-these checks establish transport and capture, not character behavior.
-
-The HTML5 build also compiles and starts in the browser. The bridge reports that
-its debug HTTP server is unavailable in WebAssembly: use browser automation for
-web screenshots/input and browser performance tools for web frame timings.
-Launch HTML5 through Defold's Project > Build HTML5 command, or from Python:
-
+## Browser path / profiling
+- Preferred build without launching a separate Firefox instance:
 ```python
-from automation_bridge import editor
-project = editor.open_project(".", start_if_needed=False)
-project.build_and_run_html5(timeout=180)
+p.bob(options={'platform':'wasm-web','architectures':'wasm-web','archive':True,'variant':'debug',
+               'bundle-output':str((p.root/'artifacts/browser').resolve())},commands=('build','bundle'),timeout=240)
 ```
-
-Run with `PYTHONPATH=automation-bridge-python`. The generated preview is under
-`build/default_html5/__htmlLaunchDir/mermaid/` and can also be served locally:
-
-```sh
-python3 -m http.server 8765 --bind 127.0.0.1 --directory build/default_html5/__htmlLaunchDir/mermaid
+- Bob must bundle OUTSIDE `build/` (reserved by Defold); the verified output is `artifacts/browser/mermaid/`. `p.build_and_run_html5(timeout=180)` remains a fallback but opens another Firefox tab and writes `build/default_html5/__htmlLaunchDir/mermaid/`.
 ```
-
-Open `http://127.0.0.1:8765/`. Browser canvas focus, clicking, and key injection
-were exercised; gameplay response needs a controller first. A native profiler
-capture of 60 main-thread frames was also verified, including scope timings,
-counters, and resource sizes. The helper records the main thread explicitly
-rather than counting other profiler threads toward the requested frame count.
-
-After updating the extension, refresh the entire matching Python wrapper using
-the extension's documented installer/update helper and restart Python.
-Do not put project code in the managed wrapper directory.
-
-## Scene plan
-
-### Opening-frame comparison
-
-`tools/image_diff.py` compares two images, writes a fixed-scale difference
-heatmap and pink difference overlay, a static comparison sheet, an interactive
-wipe report, and JSON metrics with source hashes and preprocessing settings.
-It uses Pillow and NumPy (already installed here); requirements are in
-`tools/requirements-image-diff.txt`.
-
-```sh
-python3 tools/image_diff.py Blonde-Mermaid-in-Atlantis-Ruins.png artifacts/automation/latest.png --regions tools/reference_regions.json
+python3 tools/serve.py
 ```
+- Inspect `http://127.0.0.1:8765/` with CUA browser tools. Reload after each rebuild.
+- Bridge debug HTTP is unavailable in WebAssembly. Use browser UI input and screenshots. Game publishes `window.mermaidState` for dev inspection, not engine introspection via HTTP.
+- Native profiler: `g.profiler.capture(frames=120,warmup_frames=5,thread='Main',timeout=45)`, then `.scopes()`, `.counters()`, `g.profiler.resources()`. Always filter Main; otherwise '120 frames' includes profiler/worker threads.
+- P toggles built-in profiler UI. Browser runtime performance must be measured separately. Budget33.3ms; report p95/spikes and draw calls, not just average FPS. `?debug=1` shows a rolling600-sample RAF panel and state; `?capture=1` hides HUD/freezes opening time; `?width=1920` forces full-HD framebuffer; `?trace=1` enables Defold Performance Timeline scopes (profiling overhead, use only when recording).
 
-Use equal camera aspect ratios. The current empty-project screenshot is 3:2
-while the reference is approximately 16:9, so this command deliberately rejects
-it. For an explicit diagnostic of that existing screenshot, append `--fit contain`.
-This letterboxes the candidate and records a warning; no cropping, auto-alignment,
-or color correction hides differences. Different resolutions with matching aspect
-are resized to the same analysis viewport, 960 pixels wide by default.
-
-Open `artifacts/image-diff/index.html`, or inspect `comparison.png` and
-`metrics.json`. To serve the interactive report locally:
-
-```sh
-python3 -m http.server 8766 --bind 127.0.0.1 --directory artifacts/image-diff
+## Visual measurement
 ```
+python3 tools/image_diff.py Blonde-Mermaid-in-Atlantis-Ruins.png artifacts/scene/opening.png --regions tools/reference_regions.json
+python3 -m unittest tools.test_image_diff -v
+```
+- Emits `artifacts/image-diff/index.html` (wipe + regional table), `comparison.png`, fixed-scale `heatmap.png`, highlighted overlay, hashes/settings/metrics JSON.
+- Default analysis width960, matching aspect required within .5%. Explicit `--fit contain` letterboxes mismatch and records warning. Never silently crop/warp/grade to lower error.
+- RGB MAE = average absolute RGB channel error /255 x100. SSIM uses 7x7 sample covariance, RGB mean; best1, can be negative. Changed pixels default mean RGB error>10/255. Blurred MAE is only coarse palette/layout diagnostic.
+- `--max-mae-percent 10` is an optional MAE-only gate, not 90% fidelity. Global score can hide a missing small subject; check mermaid/ruin ROIs and actual images.
+- Empty black baseline at960x540: RGB MAE39.2437%, SSIM0.0021356. Reference self-check MAE0/SSIM1. Seven known-value tests pass.
+- Matching concept art below10% pixel MAE is a stretch/exploratory target, not promised. First prioritize camera composition, silhouettes, character, water/light. Once accepted, use actual rendered opening frame for tighter regression testing.
 
-Metrics are intentionally separate:
+## Art direction / lighting checkpoint — 2026-10-15
+- User's latest priorities: old laptop, 30 FPS acceptable; focus on look/feel, not 60 FPS. Fish and other future actors must remain independent. Current layout: 571 independent instances, 197 collision boxes. No fish fields, static chunk baking, or shaft cards remain. Shared meshes still instance.
+- Compared reference against actual runtime. Primary deficits: uniform blue light, absent cast/contact shade, flat-looking ray planes, sparse material detail and simple procedural character/rocks. Lighting alone cannot close the geometry/art gap.
+- Render passes: 1024² sun depth map; opaque scene with 3×3 filtered sun shadows; quarter-resolution 32-step world-space water scattering; depth-aware 4-tap upsampling + contact shading + present. Scene RT capped1920×1080. Depth attachments MUST set `flags=render.TEXTURE_BIT` and must not be transient when sampled later.
+- Shadow pass uses the SAME animated vertex shader as the opaque pass, with separate caster predicates/constants for stone0, kelp1, fish2, mermaid3, ray6. Surface4 and dust7 do not cast. Thus fish/tail/kelp deformation and future GO movement retain matching shadows.
+- Sun direction normalize(.35,.90,-.24), surfaceY26; caustics projection and scattering use the same direction. Scattering integrates camera→opaque hit, clipped at80m, with exponential extinction and animated surface apertures. This is an art-directed single-scattering approximation, not full GI. Indirect fill approximates sky/sand bounce analytically.
+- New looser hair locks, fuller kelp, mineral mottling, brighter coral fill, fewer gold fish, extra floor ruins, and foreground pillar clearance around the ring. Still procedural prototype quality; don't describe as a close reference match.
+- `mermaid.lighting {mode:0}` normal; mode1 depth,2 scattering,3 sun visibility,4 world position. Exposed through native bridge, not normal game UI. Debug views saved under `artifacts/lighting/`; before frame is `before.png`.
+- Frozen native comparison: RGB MAE11.8134%, SSIM0.48573, blurredMAE9.4608%. Previous pre-lighting frame~11.74%/0.490. New lighting is spatially more coherent, but the overall metric has not improved. Do not claim the10% target is reached or adjust comparison to force it.
 
-- **RGB MAE percent:** mean absolute RGB error / 255 × 100. A 10% score means
-  average channel error of 25.5 levels; it does not mean 90% visual fidelity.
-- **RGB SSIM:** local structural similarity, best = 1 (can be negative). Uses a
-  7x7 uniform window and sample covariance; not a fidelity percentage.
-- **Changed pixels percent:** pixels whose mean RGB error exceeds 10/255,
-  configurable with `--pixel-threshold`.
-- **Blurred RGB MAE:** coarse palette/layout diagnostic only, not a substitute
-  for geometry, detailed structure, or correct character art.
-- **Regional scores:** explicit normalized rectangles for the mermaid, circular
-  ruin, foreground, distant corridor, and surface in `tools/reference_regions.json`.
-  These are appearance checks in fixed rectangles, not semantic object detection.
+## Verified checks and pitfalls
+- Latest `python3 tools/playtest.py` passed: identical frozen captures, W3.65m, boost7.17m (1.96×), rise2.70m, drag orbit1.20rad. Actual profiler50 draw calls; native Main Frame mean47.12ms/p9593.13ms during profiling at2560×1440 presentation. This is a regression diagnostic, not a browser FPS claim. Earlier measurements varied widely with GPU load/focus; don't use the earlier3ms CPU scope as real frame rate.
+- `python3 -m unittest tools.test_image_diff -q`: 7 known-value tests pass. Generator / playtest / server compile as Python. Native and Bob HTML5 builds pass.
+- Capture waits for `mermaid.ready` and warmup; initial OS/window resizing can change captures. Warmed frozen frames are pixel-identical.
+- Native .resize/window_width settings did not override this OS scale2 framebuffer. Read actual `g.screen()` dimensions; renderer caps the world target and presents to the physical window.
+- glTF imports fullscreen UVs flipped vertically. Every RT sampling pass restores V. First RT iteration inverted the scene; never fix screenshots after capture. Inspect actual native AND browser after renderer changes.
+- All generated GLB triangles need unit normals, colors[0,1], and no degenerate pole/leaf-tip triangles. Defold validates these strictly. Generator clamps/discards appropriately.
+- Multiple game tabs/native engines distort laptop GPU measurements. Close agent-created extra renderers; do not terminate user browser processes. Native `g.close()` only releases bridge, use `g.close_engine()` to stop our engine.
+- Browser keys: documented Playwright canvas locator `.press('w')` reaches controller; `Tab.pressKey()` was unreliable. Controller preserves80ms tap intent so short synthetic taps survive slow frames.
+- Browser evidence: `/?debug=1&capture=1&width=1280`, click **Save frame and timings**. Actual canvas PNG→`artifacts/scene/browser.png`, state/RAF samples/backend→`browser-metrics.json`. Never substitute a native image. Server accepts same-origin loopback capture POST only. Black canvas readback retries20 frames then reports unavailable.
+- `[hidden]{display:none!important}` is necessary; #loading display:grid otherwise overrode hidden.
+- Browser RAF pacing uses `display.update_frequency=0`; native configured60 cap is a ceiling, not a requirement. Timeline scopes only via `?trace=1`, with overhead. Renderer capture fixtures freeze animation but normal play resumes on input.
+- Controller idle collision skip + camera stationary cache / broad phase retained. Baking experiments increased memory/vertex traffic without a web FPS gain and were discarded. Never reintroduce actor baking to chase performance.
 
-`--max-mae-percent 10` optionally exits 1 when that single metric exceeds 10;
-the default produces a report without implying acceptance. No composite
-“match percentage” is invented. Scores depend on analysis resolution, so keep
-`--width`, viewport, and all comparison settings fixed between iterations.
+## Research used for this lighting pass
+- NVIDIA GPU Gems3, [Volumetric Light Scattering](https://developer.nvidia.com/gpugems/gpugems3/part-ii-light-and-shadows/chapter-13-volumetric-light-scattering-post-process): scattering must depend on travel through the medium and occlusion; sunlight paths parallel in world space. Our implementation uses depth reconstruction + world-space integration, not its screen-space radial-blur algorithm.
+- [Penrose underwater rendering, GDC2018](https://media.gdcvault.com/gdc2018/presentations/devon_penney_penrose_water.pdf): reference for volumetric underwater look and translucent/FX integration.
+- [Defold render API](https://defold.com/ref/render-lua/) / [render pipeline](https://defold.com/manuals/render/): texture-backed depth attachment flags, sampler bindings, material overrides, RT lifetime.
 
-For reproducible opening-frame captures, the scene must first expose a debug
-capture fixture: fixed camera/FOV, player pose, random seed, lighting/animation
-time, viewport and device pixel ratio; await model/texture loading and rendering.
-Capture the real 3D scene in that ready state, rather than the first loading frame.
-This fixture will be implemented with the scene. Browser and native captures
-must both be checked. After approving the opening frame, save it as a separate
-game-render baseline for tighter visual regression tests.
+## Next work (art first)
+1. Inspect newest browser/native frames alongside the reference. Main gap is now sculpted geometry/material quality: weathered broken rock silhouettes, ruins integrated into terraces, less uniform block scale.
+2. Refine mermaid anatomy, posed hands/arms, organic hair clumps/tips, curved fluke silhouette and scales. Current generator is an editable starting point; Blender5.2.2 is available for real sculpt/model work. Keep controller separate from mesh authoring.
+3. Improve surface light/refraction, broad value composition, natural kelp motion, local color accents; adjust rays from actual moving-camera views, not only opening frame. Preserve depth-aware integration.
+4. Profile only to catch meaningful regressions against the30 FPS budget on this device; prioritize visual gains over60 FPS optimization. Browser profiling/capture results below are the current evidence, not historical benchmarks.
 
-The empty black scene currently measures **39.24% RGB MAE**, **0.0021 SSIM**, and
-**100% changed pixels** against the art at the default analysis resolution.
-This only verifies the comparison workflow; no scene match is claimed.
-
-Known-value tests: `python3 -m unittest tools.test_image_diff -v`.
-SSIM background: [scikit-image's structural similarity example](https://scikit-image.org/docs/stable/auto_examples/transform/plot_ssim.html).
-
-### Implementation sequence
-
-Targets: **desktop and browser, keyboard/mouse, 60 FPS in browser**, with instanced
-and optimized rendering and profiler-guided development. Initial visual target:
-1080p on an agreed representative desktop/laptop; validate on real browsers and
-hardware before treating 60 FPS as a guarantee. Build one compact explorable ruin.
-
-1. **Movement and camera blockout.** Perspective camera and a proxy swimmer in
-   a small 3D test space. Camera-relative WASD, mouse orbit, ascend/descend,
-   boost, responsive acceleration, gentle drag, smooth turns/banking, collision
-   sliding, and camera obstruction handling. Publish player/camera state and
-   reset commands for repeatable bridge tests. Verify browser pointer lock and
-   focus behavior early.
-2. **Reference composition and assets.** Build a layered rocky corridor in
-   Blender with broken columns, arches, and the large circular ruin as a distant
-   landmark. Establish meter scale and glTF/GLB export early. Use modular meshes,
-   shared materials/texture atlases, and Defold-compatible instanced materials
-   for repeated rocks, columns, vegetation, and fish. Keep draw calls measurable.
-3. **Underwater rendering prototype.** Directional sun, cool ambient fill,
-   depth/distance fog with water color absorption, animated world-space caustics,
-   moving surface highlights, and sun shafts. Start with inexpensive shaft
-   geometry and restrained transparency. Prototype on a small art sample and
-   profile in-browser before producing all assets. Recreate Blender material
-   effects in Defold shaders; material nodes do not transfer as runtime shaders.
-4. **Mermaid.** Create or import a rigged blonde mermaid with a turquoise tail,
-   readable fins, and warm highlights. Blend idle, swim, boost, and turn motion;
-   add secondary hair/fin motion. A proxy supports initial control work. The
-   final character is the main asset-quality risk for matching the reference.
-5. **Living environment.** Swaying kelp, coral color accents, small fish schools,
-   occasional rays, particles, bubbles, and restrained underwater audio. Reuse
-   geometry; add distance culling/LOD and cap transparent layers and simulation
-   counts. Animate appropriate repeated assets in shaders to reduce CPU work.
-6. **Profile and polish continuously.** Use the Defold profiler for CPU scopes,
-   rendering statistics, draw calls, and memory; use browser profiling for the
-   actual web target. Budget roughly 16.7 ms/frame and inspect spikes as well as
-   averages. Check GPU cost, overdraw, asset sizes, startup time, and browser
-   memory. Keep a repeatable traversal and fixed-camera screenshot checkpoints.
-
-First milestone: swim through one convincing sunlit archway, with responsive
-controls, fog, caustics, a stable camera, and a measured browser frame budget,
-before expanding the environment. Native bridge tests and browser playtests
-complement each other; native screenshots alone do not validate browser output.
-
-## What is needed
-
-No additional paid software or services are required to start. Blender, Defold,
-Python, GLSL shaders, and the bridge cover the initial workflow. Network access
-is needed for dependency fetching and native extension builds.
-
-Useful remaining inputs: representative browser/hardware for the 60 FPS target,
-and whether a preferred rigged character already exists. Otherwise begin with
-an original stylized proxy and procedural environment assets. A polished
-character may later benefit from a supplied/licensed model or dedicated character
-art. Audio can wait until the visual and movement milestone works.
-
-References: [Automation Bridge](https://github.com/defold/extension-automation-bridge),
-[Defold models](https://defold.com/manuals/model/),
-[Defold lights](https://defold.com/manuals/light/).
+## Current browser evidence
+- Bob HTML5 build succeeds without launching Firefox. Actual browser screenshot: `artifacts/scene/browser.png` (1280×720). At capture: 600 RAF samples, mean27.37ms /36.54 FPS, p9566.70ms, trace disabled, ANGLE Intel HD530. Average clears30; spikes remain. Do not claim locked30 or60.
+- Browser W key reached input and changed Z4.00→3.99 immediately, with frozen false/speed.35m/s; full held-key/boost/vertical/orbit tests passed natively.
+- Browser reference diff: MAE11.8050%, SSIM0.48127, coarse9.43657%. Report `artifacts/browser-diff/index.html`; native report remains `artifacts/image-diff/index.html`.
+- Normal playable tab is `http://127.0.0.1:8765/`. Local preview was relaunched detached (`subprocess.Popen(...,start_new_session=True)`) because a long-lived exec session received SIGTERM and broke capture POST. PID in `artifacts/server.pid`, logs `artifacts/server.log`. Before relaunch, inspect stored PID/port; avoid duplicate servers. Stop only the known agent-owned server when required.

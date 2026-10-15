@@ -1,0 +1,6 @@
+mesh: "/assets/generated/fullscreen.glb"
+materials {
+ name: "reef"
+ material: "/render/blit.material"
+ textures { sampler: "scene_texture" texture: "/assets/generated/caustics.png" }
+}

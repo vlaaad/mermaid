@@ -1,0 +1,84 @@
+{
+  "rock0": {
+    "triangles": 64,
+    "bytes": 10344
+  },
+  "rock1": {
+    "triangles": 64,
+    "bytes": 10344
+  },
+  "rock2": {
+    "triangles": 64,
+    "bytes": 10344
+  },
+  "rock3": {
+    "triangles": 64,
+    "bytes": 10344
+  },
+  "column": {
+    "triangles": 1408,
+    "bytes": 203820
+  },
+  "arch": {
+    "triangles": 796,
+    "bytes": 115764
+  },
+  "ring": {
+    "triangles": 264,
+    "bytes": 39112
+  },
+  "kelp": {
+    "triangles": 444,
+    "bytes": 65076
+  },
+  "sponge": {
+    "triangles": 540,
+    "bytes": 78884
+  },
+  "coral_pink": {
+    "triangles": 1026,
+    "bytes": 148896
+  },
+  "coral_blue": {
+    "triangles": 1026,
+    "bytes": 148896
+  },
+  "fish": {
+    "triangles": 90,
+    "bytes": 14092
+  },
+  "fish_blue": {
+    "triangles": 90,
+    "bytes": 14104
+  },
+  "ray": {
+    "triangles": 186,
+    "bytes": 27912
+  },
+  "mermaid": {
+    "triangles": 13324,
+    "bytes": 1919800
+  },
+  "seabed": {
+    "triangles": 2294,
+    "bytes": 331428
+  },
+  "surface": {
+    "triangles": 2,
+    "bytes": 1316
+  },
+  "particle": {
+    "triangles": 16,
+    "bytes": 3440
+  },
+  "fullscreen": {
+    "triangles": 2,
+    "bytes": 1316
+  },
+  "world": {
+    "instances": 571,
+    "source_placements": 571,
+    "collision_boxes": 197,
+    "seed": 73
+  }
+}

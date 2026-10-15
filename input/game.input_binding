@@ -2,3 +2,15 @@ mouse_trigger {
   input: MOUSE_BUTTON_1
   action: "touch"
 }
+mouse_trigger { input: MOUSE_BUTTON_2 action: "look" }
+key_trigger { input: KEY_W action: "forward" }
+key_trigger { input: KEY_S action: "back" }
+key_trigger { input: KEY_A action: "left" }
+key_trigger { input: KEY_D action: "right" }
+key_trigger { input: KEY_SPACE action: "rise" }
+key_trigger { input: KEY_E action: "rise_alt" }
+key_trigger { input: KEY_LCTRL action: "dive" }
+key_trigger { input: KEY_Q action: "dive_alt" }
+key_trigger { input: KEY_LSHIFT action: "boost" }
+key_trigger { input: KEY_R action: "reset" }
+key_trigger { input: KEY_P action: "profile" }

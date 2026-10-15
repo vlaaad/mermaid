@@ -1,0 +1,6 @@
+mesh: "/assets/generated/mermaid.glb"
+materials {
+ name: "reef"
+ material: "/render/mermaid.material"
+ textures { sampler: "caustics" texture: "/assets/generated/caustics.png" }
+}
