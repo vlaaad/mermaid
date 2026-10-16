@@ -1416,7 +1416,7 @@ instances { id: "coral_pink_1413" prototype: "/assets/generated/coral_pink.go" p
 instances { id: "coral_blue_1414" prototype: "/assets/generated/coral_blue.go" position {x:-7 y:4.5 z:-9} rotation {x:0.0 y:0.9999036489328681 z:0.0 w:0.01388138504385251} scale3 {x:0.95 y:0.95 z:0.95} }
 instances { id: "sponge_1415" prototype: "/assets/generated/sponge.go" position {x:-11 y:4.5 z:-11} rotation {x:0.0 y:0.6833800105756427 z:0.0 w:-0.7300628473944106} scale3 {x:1.1 y:1.1 z:1.1} }
 instances { id: "coral_pink_1416" prototype: "/assets/generated/coral_pink.go" position {x:-9 y:9 z:-20} rotation {x:0.0 y:0.407596729781269 z:0.0 w:-0.9131620370293627} scale3 {x:1.1 y:1.1 z:1.1} }
-instances { id: "sponge_1417" prototype: "/assets/generated/sponge.go" position {x:-10.7 y:13 z:-20} rotation {x:0.0 y:0.9471716131274449 z:0.0 w:0.3207271976081134} scale3 {x:0.9 y:0.9 z:0.9} }
+instances { id: "sponge_1417" prototype: "/assets/generated/sponge.go" position {x:-15.5 y:14.42 z:-14} rotation {x:0.0 y:0.9471716131274449 z:0.0 w:0.3207271976081134} scale3 {x:0.9 y:0.9 z:0.9} }
 instances { id: "sponge_1418" prototype: "/assets/generated/sponge.go" position {x:13 y:-1.6 z:-1.5} rotation {x:0.0 y:0.6683107350561246 z:0.0 w:-0.7438822228073088} scale3 {x:2.2 y:2.2 z:2.2} }
 instances { id: "coral_pink_1419" prototype: "/assets/generated/coral_pink.go" position {x:14.4 y:3.1 z:-7} rotation {x:0.0 y:0.7893443477122236 z:0.0 w:0.6139507315206687} scale3 {x:1.4 y:1.4 z:1.4} }
 instances { id: "coral_blue_1420" prototype: "/assets/generated/coral_blue.go" position {x:12 y:3 z:-9} rotation {x:0.0 y:0.7684267607625803 z:0.0 w:-0.6399377417717509} scale3 {x:1.2 y:1.2 z:1.2} }
