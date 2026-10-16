@@ -134,9 +134,9 @@
     "bytes": 1380
   },
   "world": {
-    "instances": 1681,
+    "instances": 1722,
     "source_placements": 1722,
-    "collision_boxes": 1175,
+    "collision_boxes": 1213,
     "seed": 73
   }
 }

@@ -701,26 +701,7 @@ def main():
                               (.50,.76,25,2.0,2.5,3),(.57,.68,41,2.7,3.1,4),
                               (.64,.61,51,3.0,3.4,4)]:
         p=at(u,v,d)
-        start_objects,start_obstacles=len(objects),len(obstacles)
         terrace(float(p[0]),float(p[2]),rx,rz,float(p[1]),tiers)
-        if u==.50:
-            # One authored outcrop replaces the small regular pillar cluster.
-            # Consume the old authoring RNG/ID slots first: all other islands,
-            # vegetation and swimming actors keep exactly their prior placement.
-            del objects[start_objects:];del obstacles[start_obstacles:]
-            reserved_slots=placements
-            for label,asset,offset,scale,yaw in [
-                ('near_outcrop_core','rock2',(0,-1.1,0),(1.65,2.2,1.65),-.14),
-                ('near_outcrop_base','rock1',(.1,-2.1,.1),(2.15,2.0,1.9),.06),
-                ('near_outcrop_left','rock3',(-1.2,-.55,-.65),(.9,1.1,.95),.20),
-                ('near_outcrop_right','rock0',(1.15,-1.05,.4),(.9,1.8,1.05),-.08),
-                ('near_outcrop_step','rock1',(.65,-1.5,4.8),(1.5,1.2,2.0),-.20),
-                ('near_outcrop_ledge','rock3',(.45,-1.1,2.6),(1.2,1.8,1.6),.12),
-                ('near_outcrop_cap','rock0',(-.35,.25,-.85),(.9,.7,.8),.18),
-            ]:place(asset,p+vec(offset),scale,yaw,True,label=label)
-            place('coral_gold',p+vec((.9,-.2,.6)),.45,label='near_outcrop_coral')
-            place('sponge',p+vec((1.2,-.90,4.9)),.35,label='near_outcrop_sponge')
-            placements=reserved_slots
     # Pillar base/cap, circular opening and gateway have distinct reference proportions.
     pillar=at(.582,.43,51)
     terrace(float(pillar[0]),float(pillar[2]),3.8,4.0,float(pillar[1])-.1,5)
