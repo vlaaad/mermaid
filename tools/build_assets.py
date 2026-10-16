@@ -838,6 +838,8 @@ def main():
     # These supported shelf actors share a fixed authored depth transform.
     ledge_depth_scale={p:1.5 for p in [
         (15,1.2,-7),(13,3,-5),(14.4,3.1,-7),(12,3,-9),
+        (-7.5,3.2,-9),(-7.5,-.3,-9),(-7.8,4.06,-7),
+        (-7,3.5,-9),(-7,3.5,-8),(-4.5,-1.8,-12),
     ]}
     # Foreground plants frame the view without forming a wall of broad leaves.
     for p,scale in [((-9.2,1.30,.3),1.3),((-7.8,4.06,-7),.8),((-14.8,14.40,-14),1.3),((13,3,-5),1.6),((19,6.85,-13),1.5),((-4,-4,-22),1.3),((14,-4,-36),1.4)]:

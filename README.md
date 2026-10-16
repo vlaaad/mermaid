@@ -4,11 +4,11 @@
 
 Build an interactive 3D scene matching `Blonde-Mermaid-in-Atlantis-Ruins.png`, with satisfying keyboard/mouse swimming on desktop and browser. Target hardware: Intel HD530 laptop; aim for 30 FPS.
 
-**Current target: 20% of pixels within 10 RGB levels per channel. Latest measured: 18.46% (pass97).** Exact matches: 0.0156%; RGB MAE: 9.8221%; SSIM: 0.46501. These are diagnostics, not overall fidelity percentages. Evidence: `artifacts/progress/pass97/`.
+**Current target: 20% of pixels within 10 RGB levels per channel. Latest measured: 19.01% (pass98).** Exact matches: 0.0150%; RGB MAE: 9.7852%; SSIM: 0.46040. These are diagnostics, not overall fidelity percentages. Evidence: `artifacts/progress/pass98/`.
 
 Retained work: broader pointed fins with clean concave topology and filtered veins; larger head/scalp; lower arms and flowing locks; rotated connected arcade, deeper column fluting, all 11 required column regions present; olive grass with three corrected roots; blue rock/floor materials, height-based bottom-water haze, foreground stone volume with local bevel detail. Native pass87: 24.0ms mean / 24.5ms p95, 78 draws. Previous slow profiles overlapped CPU-heavy fitting; do not attribute them solely to rock bevels.
 
-Retained layout now includes broader columns and a deeper right ledge group, with its plants/collision moved together to expose the orange school. The right mid-terrace trial (43,-42, height13.5) is retained. Rock material now uses softer direct light and stronger cool ambient fill, verified in pass97 against the same frozen camera/time. Latest validated browser build remains pass53, about 19 FPS; rebuild and validate current web output before reporting browser performance.
+Retained layout now includes broader columns and deeper left and right ledge groups, with their plants/collision moved together; the right group exposes the orange school. The right mid-terrace trial (43,-42, height13.5) is retained. Rock material now uses softer direct light and stronger cool ambient fill, verified in pass97 against the same frozen camera/time. Latest validated browser build remains pass53, about 19 FPS; rebuild and validate current web output before reporting browser performance.
 
 ## Produce a diff
 
