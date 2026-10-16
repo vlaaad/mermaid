@@ -73,7 +73,7 @@ vec3 surfaceColor(float t) {
     vec3 reflected=mix(vec3(.025,.40,.77),vec3(.12,.65,.95),facets);
     shaded=mix(transmitted,reflected,fresnel*.6);
     float glow=exp(-dot((p-vec2(48.0,-80.0))/vec2(55.0,60.0),(p-vec2(48.0,-80.0))/vec2(55.0,60.0)));
-    shaded+=vec3(.16,.24,.22)*glow;
+    shaded+=vec3(.2976,.4176,.3036)*glow;
     return shaded*vec3(.53,.78,.994);
 }
 vec3 fogged(vec3 shaded,float density,bool surface) {
