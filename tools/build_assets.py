@@ -443,11 +443,11 @@ def mermaid():
                 u0,u1=i/28,(i+1)/28;v0,v1=j/10,(j+1)/10
                 uv=[(u0,v0),(u1,v0),(u1,v1),(u0,v1)]
                 pts=[fin(*q) for q in uv];ns=[fn(*q) for q in uv]
-                col=(.24+.39*v1,.56+.16*v1,.39+.15*v1,.5)
+                col=(.18+.45*v1,.38+.38*v1,.65+.07*v1,.5)
                 for ids in ([0,1,2],[0,2,3]):m.tri(*(pts[k] for k in ids),col,normals=[ns[k] for k in ids])
         for i in range(1,18):
             u=i/19
-            m.tube([fin(u,v) for v in [.06,.25,.5,.75,.95]],[.0038,.0036,.003,.002,.0008],(.34,.69,.48,.5),5)
+            m.tube([fin(u,v) for v in [.06,.25,.5,.75,.95]],[.0038,.0036,.003,.002,.0008],(.34,.69,.64,.5),5)
     # Hair hugs the whole rear scalp, then separates into broad wavy locks.
     hair=(.84,.66,.36)
     for i in range(15):

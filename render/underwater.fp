@@ -153,7 +153,10 @@ void main() {
         float spec=pow(max(dot(n,halfVector),0.0),24.0)*shadow;
         shaded+=vec3(.35,.42,.32)*spec*.18;
         shaded+=vec3(.18,.37,.32)*pattern*.13*shadow;
-        if(var_color.a>.37 && var_color.a<.62)shaded+=base*vec3(.10,.08,.03);
+        if(var_color.a>.37 && var_color.a<.62) {
+            shaded+=base*vec3(.10,.08,.03);
+            shaded*=1.5; // Thin fin light response only; body/hair stay fixed.
+        }
         if(var_color.a>.62 && var_color.a<.87) {
             float grooves=.96+.04*sin(var_uv.x*90.0);
             shaded*=grooves*(.92+var_uv.y*.08);
