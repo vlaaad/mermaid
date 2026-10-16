@@ -152,7 +152,7 @@ void main() {
         float leafLight=.30+.70*abs(dot(n,sun));
         shaded=base*(vec3(.30,.46,.23)+vec3(1.85,1.65,.60)*leafLight*shadow);
         shaded+=base*vec3(.42,.58,.22)*transmission*shadow*.7;
-        shaded*=vec3(.95,.75,1.05); // Cool green fronds retain warm sunlit edges.
+        shaded*=vec3(.83,.60,.62); // Muted green fronds retain warm sunlit edges.
     }
     if(params.x>1.5 && params.x<2.5) {
         shaded=base*(vec3(.60,.65,.48)+vec3(.75,.79,.53)*diffuse*shadow);
