@@ -25,6 +25,14 @@
 - Scene renders on native and WebGL. Do not call it a close art match yet: mermaid art, rock variation, and composition remain visibly simpler than reference.
 
 ## Run / capture / inspect
+One command, no required arguments:
+```bash
+python3 tools/capture_diff.py
+```
+- Reuses/starts the editor, builds/launches a native game, waits for `mermaid.ready`, freezes the opening at time3, warms30 frames, captures full resolution, exits the game, THEN runs the image comparison. The editor stays open. Game cleanup runs even if capture fails.
+- Outputs `artifacts/image-diff/capture.png` (original screenshot), `capture.json` (state/framebuffer), and `index.html` plus diff images/metrics. Paths default relative to the repository, so the script also works when invoked from another directory.
+- Optional `--output DIRECTORY`, `--reference IMAGE`, `--max-mae-percent 4`. No color-error gate by default; successful workflow exits0. Explicit gate failure exits1; build/capture/comparison failure exits2. Never interpret color MAE as a visual-fidelity percentage.
+
 ```
 python3 tools/build_assets.py
 python3 tools/automation.py --build --focus --key W --hold 0.5
@@ -117,3 +125,10 @@ python3 -m unittest tools.test_image_diff -v
 - Next art pass must start with reference composition and world proportions, then tail modeling and a convincing distant water surface. Do not attempt to solve these with blanket fog/palette changes or a smaller color-error score.
 - Audit of rejected frozen browser report:9.756% average RGB error, but82.20% of pixels exceeded mean RGB difference10/255 and SSIM was only0.456. These separate values demonstrate why presenting only MAE was misleading. Formula implementation passes7 known-value tests; the failure was using color MAE as the main art objective.
 - Rollback verification: native build launched; frozen and animated captures saved under artifacts/rollback/. Bob wasm-web build/bundle succeeded and existing localhost browser tab was reloaded and visually inspected. Hair/green tail are solid again in these captures. Restored renderer retains historical material warnings/art limitations; do not carry forward the rejected pass's zero-warning or improved-score claims. Only README differs from913f1fb after the revert.
+
+## In-progress art revision — paused at user's request
+- Work after rollback remains UNCOMMITTED and is not an accepted visual match. Native pass4 build/capture succeeded (`artifacts/open-world/pass4.png`). Browser has NOT been rebuilt for this revision; existing browser preview still shows rollback baseline. Do not claim browser validation of these changes.
+- Working geometry now has an open basin with staggered terraces/isolated platforms, seabedY=-4.25, waterY42, square masonry window, curved fuller tail/swept flukes, fingers, larger wavy hair clumps. Shared actors remain separate. Generator now calculates tube normals from surface derivatives, uses tube UVs, and smooth scalp normals.
+- Added smooth sand material, packed caustics/stone/water channels, irregular animated water shading, directional fog background shared with object fog, and corrected receiver-plane shadows. NO opaque depth prepass. Material declaration cleanup retained only for shaders that use the constants.
+- User paused scene work to request tooling. Finish the zero-argument capture/diff command without resuming scene edits. Art revision still needs animated/orbit visual inspection, browser build/profiling, and further composition/model/surface refinement. Current diagnostic pass4: MAE11.8649%, SSIM0.48805, changed pixels87.23%; not a claim of visual fidelity or acceptance.
+- `python3 tools/capture_diff.py` verified end to end with NO arguments: native build/run, frozen capture, engine exit confirmed by bridge before diff, report emitted, exit0. Capture state confirms frozen=true and metrics source path points to the newly saved capture.png.
