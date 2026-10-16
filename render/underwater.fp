@@ -59,7 +59,7 @@ vec3 surfaceColor(float t) {
     float facets=texture(caustics,fineUV).b;
     float ridge=texture(caustics,p*.0425+warp*.23+vec2(-t*.002,0)).r;
     float clarity=1.0-smoothstep(90.0,180.0,var_depth);
-    facets=mix(.5,facets,clarity*.70);
+    facets=mix(.5,facets,clarity*.35);
     ridge*=clarity*.70;
     vec2 e=vec2(1.0/256.0,0.0);
     vec2 slope=vec2(texture(caustics,fineUV+e.xy).b-texture(caustics,fineUV-e.xy).b,
