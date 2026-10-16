@@ -53,12 +53,12 @@ vec3 surfaceColor(float t) {
     float h1=texture(caustics,uv1).b;
     float h2=texture(caustics,uv2).b;
     vec2 warp=vec2(h1,h2)-.5;
-    vec2 fineUV=mat2(.94,-.342,.342,.94)*p*.028+warp*.31+vec2(t*.001,-t*.002);
+    vec2 fineUV=mat2(.94,-.342,.342,.94)*p*.070+warp*.31+vec2(t*.001,-t*.002);
     float facets=texture(caustics,fineUV).b;
-    float ridge=texture(caustics,p*.017+warp*.23+vec2(-t*.002,0)).r;
+    float ridge=texture(caustics,p*.0425+warp*.23+vec2(-t*.002,0)).r;
     float clarity=1.0-smoothstep(90.0,180.0,var_depth);
-    facets=mix(.5,facets,clarity);
-    ridge*=clarity;
+    facets=mix(.5,facets,clarity*.70);
+    ridge*=clarity*.70;
     vec2 e=vec2(1.0/256.0,0.0);
     vec2 slope=vec2(texture(caustics,fineUV+e.xy).b-texture(caustics,fineUV-e.xy).b,
                     texture(caustics,fineUV+e.yx).b-texture(caustics,fineUV-e.yx).b)*1.7;
@@ -72,7 +72,7 @@ vec3 surfaceColor(float t) {
     shaded=mix(transmitted,reflected,fresnel*.6);
     float glow=exp(-dot((p-vec2(48.0,-80.0))/vec2(55.0,60.0),(p-vec2(48.0,-80.0))/vec2(55.0,60.0)));
     shaded+=vec3(.16,.24,.22)*glow;
-    return shaded;
+    return shaded*vec3(.53,.78,.994);
 }
 vec3 fogged(vec3 shaded,float density,bool surface) {
     float blend=1.0-exp(-max(var_depth-3.0,0.0)*density);
