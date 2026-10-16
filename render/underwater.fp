@@ -176,7 +176,7 @@ void main() {
             float vein=(1.0-smoothstep(.025,.025+width,distanceToVein))*smoothstep(.02,.12,var_uv.y);
             shaded=mix(shaded,shaded*vec3(.65,.95,1.20)+vec3(.025,.07,.10),vein*.65);
             shaded+=base*vec3(.10,.08,.03);
-            shaded*=1.5; // Thin fin light response only; body/hair stay fixed.
+            shaded*=vec3(1.99,1.86,1.30); // Pale yellow-green transmitted light through the fin.
         }
         if(var_color.a>.62 && var_color.a<.87) {
             float grooves=.96+.04*sin(var_uv.x*90.0);
