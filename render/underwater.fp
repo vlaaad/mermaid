@@ -20,8 +20,8 @@ uniform fs_uniforms {
 // One-variable fitting pass: caustic contribution only.
 const float CAUSTIC_GAIN=.90;
 const float STONE_CAUSTIC_RESPONSE=.35;
-const vec3 ROCK_AMBIENT_GAIN=vec3(1.000000,1.000000,1.000000);
-const vec3 ROCK_SUN_GAIN=vec3(1.000000,1.000000,1.000000);
+const vec3 ROCK_AMBIENT_GAIN=vec3(1.596154,1.326923,1.147436);
+const vec3 ROCK_SUN_GAIN=vec3(0.250000,0.250000,0.250000);
 float visibility(vec3 p,vec3 normal,float ndl) {
     if(abs(light_matrix[3].w)<.0001)return 1.0;
     vec4 light=light_matrix*vec4(p+normal*.025,1.0);
