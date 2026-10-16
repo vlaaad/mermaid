@@ -8,7 +8,7 @@ import unittest
 import numpy as np
 from PIL import Image
 
-from tools.image_diff import compare, difference_image, metrics, prepare, ssim_rgb
+from tools.image_diff import LABEL_HEIGHT, compare, comparison_image, difference_image, metrics, prepare, ssim_rgb
 
 
 class ImageDiffTests(unittest.TestCase):
@@ -77,12 +77,36 @@ class ImageDiffTests(unittest.TestCase):
         b.putpixel((1, 0), (0, 0, 64))  # Similar brightness, different color.
         b.putpixel((2, 0), (255, 64, 0))
         result = difference_image(a, b)
-        self.assertEqual(result.getpixel((0, 0)), 64)
-        self.assertEqual(result.getpixel((1, 0)), 128)
-        self.assertEqual(result.getpixel((2, 0)), 255)
+        self.assertEqual(result.getpixel((0, 0)), 49)
+        self.assertEqual(result.getpixel((1, 0)), 115)
+        self.assertEqual(result.getpixel((2, 0)), 194)
         np.testing.assert_array_equal(np.asarray(result), np.asarray(difference_image(b, a)))
         self.assertLess(result.getpixel((0, 0)), result.getpixel((1, 0)))
         self.assertLess(result.getpixel((1, 0)), result.getpixel((2, 0)))
+
+    def test_equal_grayscale_brightness_does_not_hide_different_colors(self):
+        a = Image.new("RGB", (20, 20), (100, 100, 100))
+        b = Image.new("RGB", (20, 20), (0, 132, 200))
+        np.testing.assert_array_equal(np.asarray(a.convert("L")), np.asarray(b.convert("L")))
+        self.assertGreater(difference_image(a, b).getpixel((0, 0)), 0)
+        # Changing an additional channel also increases error (unlike max-channel distance).
+        black = Image.new("RGB", (20, 20), "black")
+        red = Image.new("RGB", (20, 20), (64, 0, 0))
+        yellow = Image.new("RGB", (20, 20), (64, 64, 0))
+        self.assertGreater(difference_image(black, yellow).getpixel((0, 0)), difference_image(black, red).getpixel((0, 0)))
+
+    def test_sheet_has_sources_above_one_unblended_difference_panel(self):
+        a = Image.new("RGB", (32, 20), (100, 100, 100))
+        b = a.copy()
+        b.paste((0, 132, 200), (16, 0, 32, 20))
+        sheet = comparison_image(a, b)
+        np.testing.assert_array_equal(np.asarray(sheet.crop((0, LABEL_HEIGHT, 32, LABEL_HEIGHT + 20))), np.asarray(a))
+        np.testing.assert_array_equal(np.asarray(sheet.crop((32, LABEL_HEIGHT, 64, LABEL_HEIGHT + 20))), np.asarray(b))
+        top = 20 + 2 * LABEL_HEIGHT
+        panel = sheet.crop((0, top, 64, top + 40))
+        expected = difference_image(a, b).resize((64, 40), Image.Resampling.NEAREST).convert("RGB")
+        np.testing.assert_array_equal(np.asarray(panel), np.asarray(expected))
+        self.assertEqual(panel.getpixel((0, 0)), (0, 0, 0))
 
     def test_old_html_and_diff_images_are_removed(self):
         with tempfile.TemporaryDirectory() as tmp:

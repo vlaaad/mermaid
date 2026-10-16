@@ -1,4 +1,4 @@
-"""Make one pixel-difference PNG from reference art and an actual rendered frame.
+"""Make one PNG: reference and game capture above one RGB difference image.
 
 No alignment or color correction. Pixel metrics are diagnostics, not art acceptance.
 
@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageFilter, ImageOps
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -72,19 +72,47 @@ def metrics(first, second, pixel_threshold=10):
 
 
 DIFF_GAMMA = .5
+LABEL_HEIGHT = 40
+FOOTER_HEIGHT = 60
 LEGACY_FILES = ("reference.png", "candidate.png", "heatmap.png", "highlighted.png", "comparison.png", "index.html")
 
 
 def difference_image(first, second):
     """One grayscale error image: equal=black, greater channel error=brighter.
 
-    Use the largest absolute RGB channel difference so color errors cannot cancel.
+    Use RGB root-mean-square distance so every color channel contributes and
+    opposite channel changes cannot cancel. Do not convert inputs to grayscale.
     A fixed square-root curve exposes small differences without clipping large
     ones or normalizing each run differently. Only maximal error reaches white.
     """
-    delta = np.abs(np.asarray(first, dtype=np.int16) - np.asarray(second, dtype=np.int16))
-    error = delta.max(axis=2) / 255.0
+    delta = (np.asarray(first, dtype=np.float64) - np.asarray(second, dtype=np.float64)) / 255.0
+    error = np.sqrt(np.mean(delta * delta, axis=2))
     return Image.fromarray(np.rint(255 * error ** DIFF_GAMMA).astype(np.uint8))
+
+
+def comparison_image(reference, candidate):
+    """One error map; the two source previews provide context above it."""
+    w, h = reference.size
+    sheet = Image.new("RGB", (2 * w, 3 * h + 2 * LABEL_HEIGHT + FOOTER_HEIGHT), "#101827")
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
+    except OSError:
+        font = ImageFont.load_default()
+    draw = ImageDraw.Draw(sheet)
+    draw.text((12, 10), "REFERENCE", font=font, fill="white")
+    draw.text((w + 12, 10), "GAME CAPTURE", font=font, fill="white")
+    sheet.paste(reference, (0, LABEL_HEIGHT))
+    sheet.paste(candidate, (w, LABEL_HEIGHT))
+    y = h + LABEL_HEIGHT
+    draw.text((12, y + 10), "RGB DIFFERENCE - black: equal / brighter: larger difference", font=font, fill="white")
+    # Nearest-neighbor enlargement preserves the exact error pixels, without
+    # introducing interpolation/blending into the difference panel.
+    diff = difference_image(reference, candidate).resize((2 * w, 2 * h), Image.Resampling.NEAREST)
+    sheet.paste(diff, (0, y + LABEL_HEIGHT))
+    y = sheet.height - FOOTER_HEIGHT
+    draw.text((12, y + 6), "All RGB channels contribute, including color changes with equal brightness. Fixed square-root contrast boost.", font=font, fill="white")
+    draw.text((12, y + 32), f"Analysis: {w} x {h}; diff shown at 2x. No alignment, cropping or color matching. No overlay.", font=font, fill="white")
+    return sheet
 
 
 def compare(reference_path, candidate_path, output, *, width=960, fit="strict", pixel_threshold=10, regions=None, max_mae=None):
@@ -117,13 +145,13 @@ def compare(reference_path, candidate_path, output, *, width=960, fit="strict", 
         "reference": {"path": str(Path(reference_path).resolve()), "sha256": hashlib.sha256(Path(reference_path).read_bytes()).hexdigest(), "size": list(original_ref.size)},
         "candidate": {"path": str(Path(candidate_path).resolve()), "sha256": hashlib.sha256(Path(candidate_path).read_bytes()).hexdigest(), "size": list(original_candidate.size)},
         "settings": {"analysis_size": list(ref.size), "fit": fit, "aspect_ratio_error_percent": aspect_error * 100, "pixel_threshold_rgb_levels": pixel_threshold, "blur_sigma_pixels": sigma, "ssim": "RGB mean, 7x7 uniform window, sample covariance, K1=.01 K2=.03, border excluded", "alpha": "composite on black", "color": "encoded RGB; no exposure, alignment, warp, or color matching"},
-        "visualization": {"version": 3, "image": "diff.png", "difference": "maximum absolute RGB channel difference", "display_curve": "255 * sqrt(max(abs(reference RGB - capture RGB)) / 255)", "scale": "fixed across runs; equal=black, larger error=brighter, maximum error=white; no clipping or per-image normalization"},
+        "visualization": {"version": 4, "image": "diff.png", "layout": "reference and game capture side by side above ONE difference panel", "difference": "RGB root-mean-square distance (not grayscale input)", "display_curve": "255 * sqrt(sqrt(mean(((reference RGB - capture RGB) / 255)^2)))", "difference_display_scale": "2x nearest-neighbor", "scale": "fixed across runs; equal=black, larger error=brighter, maximum error=white; no clipping or per-image normalization"},
         "metrics": scores, "regions": regional,
         "mae_gate": None if max_mae is None else {"limit_percent": max_mae, "passed": scores["rgb_mae_percent"] <= max_mae},
         "warnings": ["Aspect ratios differ: candidate was letterboxed, not cropped or stretched."] if aspect_error > 0.005 else [],
     }
     output.mkdir(parents=True, exist_ok=True)
-    difference_image(ref, candidate).save(output / "diff.png")
+    comparison_image(ref, candidate).save(output / "diff.png")
     (output / "metrics.json").write_text(json.dumps(report, indent=2) + "\n")
     # This tool reserves these legacy output names. Remove obsolete reports so
     # the directory presents one current review image, not stale visualizations.
