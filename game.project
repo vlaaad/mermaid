@@ -10,6 +10,7 @@ width = 1280
 height = 720
 high_dpi = 0
 update_frequency = 60
+samples = 4
 
 [engine]
 run_while_iconified = 1

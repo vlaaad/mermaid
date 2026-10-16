@@ -1,11 +1,18 @@
-local function target(w,h,depth_texture,format)
+local function target(w,h,depth_texture,format,samples)
     return render.render_target({
+        sample_count=samples or 1,
         [graphics.BUFFER_TYPE_COLOR0_BIT]={format=format or graphics.TEXTURE_FORMAT_RGBA,width=w,height=h,min_filter=graphics.TEXTURE_FILTER_LINEAR,mag_filter=graphics.TEXTURE_FILTER_LINEAR,u_wrap=graphics.TEXTURE_WRAP_CLAMP_TO_EDGE,v_wrap=graphics.TEXTURE_WRAP_CLAMP_TO_EDGE},
         [graphics.BUFFER_TYPE_DEPTH_BIT]={format=graphics.TEXTURE_FORMAT_DEPTH,width=w,height=h,flags=depth_texture and render.TEXTURE_BIT or 0,min_filter=graphics.TEXTURE_FILTER_NEAREST,mag_filter=graphics.TEXTURE_FILTER_NEAREST,u_wrap=graphics.TEXTURE_WRAP_CLAMP_TO_EDGE,v_wrap=graphics.TEXTURE_WRAP_CLAMP_TO_EDGE}
     })
 end
 
 function init(self)
+    local requested=math.max(1,sys.get_config_int("display.samples",0))
+    -- This WebGL backend cannot resolve multisampled offscreen targets. Apply
+    -- edge AA in the existing presentation pass instead of requesting a fallback.
+    local fxaa=sys.get_sys_info().system_name=="HTML5" and requested>1
+    self.scene_samples=fxaa and 1 or requested
+    self.fxaa=fxaa
     self.solid=render.predicate({"reefsolid"})
     self.thin=render.predicate({"reefthin"})
     self.bubbles=render.predicate({"bubbles"})
@@ -17,6 +24,8 @@ function init(self)
     self.view=vmath.matrix4_look_at(vmath.vector3(0,7,13),vmath.vector3(0,6,-13),vmath.vector3(0,1,0))
     self.constants=render.constant_buffer()
     self.constants.visual_debug=vmath.vector4()
+    self.constants.antialias=vmath.vector4(self.fxaa and 1 or 0,0,0,0)
+    print("SCENE_AA "..(self.fxaa and "FXAA" or (self.scene_samples>1 and "MSAA x"..self.scene_samples or "OFF")))
     self.constants.time_data=vmath.vector4(3,0,0,0)
     self.constants.camera_pos=vmath.vector4(0,7,13,1)
     self.constants.fog_settings=vmath.vector4(0.062500,0.625000,0.945500,.0165)
@@ -33,12 +42,17 @@ function update(self)
     local scale=math.min(1,1280/w,720/h)
     local rw,rh=math.floor(w*scale),math.floor(h*scale)
     if not self.target then
-        self.target=target(rw,rh,true)
+        -- MSAA belongs on geometry, before the resolved image reaches post effects.
+        self.target=target(rw,rh,self.scene_samples==1,nil,self.scene_samples)
+        -- OpenGL resolves color only. Preserve a real single-sample depth texture
+        -- for volume integration and silhouette-aware upsampling.
+        self.scene_depth=self.scene_samples>1 and target(rw,rh,true) or self.target
         self.composite=target(rw,rh,false)
         self.rw,self.rh=rw,rh
         self.water=target(math.ceil(rw/4),math.ceil(rh/4),false,graphics.TEXTURE_FORMAT_RGBA16F)
     elseif rw~=self.rw or rh~=self.rh then
         render.set_render_target_size(self.target,rw,rh)
+        if self.scene_depth~=self.target then render.set_render_target_size(self.scene_depth,rw,rh) end
         render.set_render_target_size(self.composite,rw,rh)
         render.set_render_target_size(self.water,math.ceil(rw/4),math.ceil(rh/4))
         self.rw,self.rh=rw,rh
@@ -159,9 +173,27 @@ function update(self)
     render.disable_state(graphics.STATE_DEPTH_TEST)
     self.constants.inverse_view_projection=vmath.inv(projection*self.view)
     self.constants.screen_size=vmath.vector4(rw,rh,math.ceil(rw/4),math.ceil(rh/4))
+    if self.scene_depth~=self.target then
+        render.set_render_target(self.scene_depth)
+        render.set_viewport(0,0,rw,rh)
+        render.set_depth_mask(true)
+        render.clear({[graphics.BUFFER_TYPE_DEPTH_BIT]=1})
+        render.set_color_mask(false,false,false,false)
+        render.enable_state(graphics.STATE_DEPTH_TEST)
+        render.enable_material("scene_depth")
+        render.enable_state(graphics.STATE_CULL_FACE)
+        render.set_cull_face(graphics.FACE_TYPE_BACK)
+        render.draw(self.solid,{frustum=projection*self.view})
+        render.disable_state(graphics.STATE_CULL_FACE)
+        render.draw(self.thin,{frustum=projection*self.view})
+        render.disable_material()
+        render.disable_state(graphics.STATE_DEPTH_TEST)
+        render.set_depth_mask(false)
+        render.set_color_mask(true,true,true,true)
+    end
     render.set_render_target(self.water)
     render.set_viewport(0,0,math.ceil(rw/4),math.ceil(rh/4))
-    render.enable_texture("scene_depth",self.target,graphics.BUFFER_TYPE_DEPTH_BIT)
+    render.enable_texture("scene_depth",self.scene_depth,graphics.BUFFER_TYPE_DEPTH_BIT)
     if self.solar_flux then render.enable_texture("solar_flux",self.solar_flux) end
     render.enable_material("volume")
     render.draw(self.blit,{constants=self.constants})
@@ -181,7 +213,7 @@ function update(self)
     render.set_viewport(0,0,w,h)
     render.enable_texture("scene_texture",self.composite,graphics.BUFFER_TYPE_COLOR0_BIT)
     render.enable_material("present")
-    render.draw(self.blit)
+    render.draw(self.blit,{constants=self.constants})
     render.disable_material()
     render.disable_texture("scene_texture")
     render.enable_state(graphics.STATE_BLEND)

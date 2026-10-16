@@ -81,7 +81,7 @@ Mermaid vertex alpha identifies skin 0, tail .25, fluke .5, hair .75, garment 1.
 
 Opaque depth-tested geometry with a separate premultiplied transparent bubble pass; no depth prepass or alpha discard. Keep fish, fins, hair and kelp two-sided. Sampled depth attachments require `render.TEXTURE_BIT`; fullscreen glTF UVs need V restored at each render-target lookup.
 
-Geometry/post cap: 1280×720; 512² RGBA32F EVSM4 near shadows plus 1024² distant depth shadows; quarter-resolution 64-interval shadowed single scattering in RGBA16F; depth-aware upsampling. Float render targets and linear float filtering are required; validated on HD530 desktop OpenGL and WebGL2. Shared GLBs index complete vertex tuples to preserve seams and normals. Collision substeps ≤25ms and dt cap .1 prevent slow motion under load.
+Geometry/post cap: 1280×720; desktop scene MSAA follows Display Samples (4 by default), with FXAA on WebGL; 512² RGBA32F EVSM4 near shadows plus 1024² distant depth shadows; quarter-resolution 64-interval shadowed single scattering in RGBA16F; depth-aware upsampling. Float render targets and linear float filtering are required; validated on HD530 desktop OpenGL and WebGL2. Shared GLBs index complete vertex tuples to preserve seams and normals. Collision substeps ≤25ms and dt cap .1 prevent slow motion under load.
 
 Rejected experiments: hand-extruded cliffs (passes21–22), cutout hair/tail/plants (`7e66368`, reverted), connected outcrop (passes50–51, reverted: worse visuals and 92 draws), `SORT_NONE` (pass52: 97 draws). Do not restore blindly.
 
@@ -120,3 +120,16 @@ Native controls, boosted boulder contact, all 16 image/structure unit tests and 
 Final WebGL build succeeds with no build issues. Swimming input passes, and no WebGL/render warnings or errors occur; the debug bridge reports only its expected unavailable HTTP server. The saved frozen 1280×720 capture measured 15.0 FPS (66.8ms mean / 183.3ms p95, 600 RAF samples). Live samples varied from about 11 to 18 FPS in the same session. Swimming and upward orbit also pass; `sunlight.png` records the moved camera and visible shafts. Evidence: `artifacts/shadow-repair/browser-final/`.
 
 MSAA comparison with identical frozen camera: Display Samples 4 measured 46.54ms, Samples 0 measured 41.16ms, then Samples 4 measured 42.95ms (120 frames each, 100 draws). The 0/4 screenshots are pixel-identical. Display Samples controls window MSAA independently of our single-sample offscreen scene targets, so this option does not smooth scene geometry in the current pipeline. It may add a small cost, but does not explain the confirmed column mesh holes. The user’s setting remains 4. Evidence: `artifacts/shadow-repair/msaa/`; [Defold render target/MSAA documentation](https://defold.com/manuals/render/).
+
+
+## Scene sampling
+
+Display Samples now controls scene anti-aliasing. The checked-in value is 4. Desktop uses the requested scene-target MSAA count (2/4/8 subject to hardware support); 0/1 disables it. Shadow maps and post-process targets stay single-sampled. Defold resolves multisampled color when switching targets, but its OpenGL backend does not resolve the sampled depth attachment. Desktop MSAA therefore uses a separate unshaded, color-write-disabled geometry pass for the water/upsampling depth texture. The single-sample path skips that pass. Both targets resize with the viewport.
+
+In this engine build, WebGL reports offscreen MSAA unsupported and falls back to one sample. Browser builds therefore use a compact FXAA edge filter in the existing presentation pass when Display Samples exceeds 1, with no MSAA target or extra depth pass. It runs after tone mapping, skips low-contrast pixels and preserves local luminance bounds; it does not alter depth. Browser FXAA is a fallback, not four-sample MSAA. Startup logs identify OFF, MSAA xN or FXAA. Reference: [NVIDIA FXAA white paper](https://developer.download.nvidia.com/assets/gamedev/files/sdk/11/FXAA_WhitePaper.pdf).
+
+Verified native 1280×720 framebuffer A/B: no MSAA measured 39.52ms mean / 88.38ms p95 (100 draws), versus 53.79ms / 109.30ms at four samples (140 draws). This is a real quality/cost tradeoff: about 14.27ms in this run. The architecture mask gains partial edge coverage from 10 to 5,338 pixels; the water-depth diagnostic is pixel-identical. This comparison exercised target resizing as well. Evidence: `artifacts/sampling/compare-1280/`. An earlier resize request settled at 640×360; those figures are kept separately in `artifacts/sampling/compare/` and are not 1280×720 results.
+
+Native close-view captures, boosted boulder contact and all 16 image/structure tests pass. Evidence: `artifacts/sampling/msaa4/`. Earlier window-only MSAA comparisons above predate this fix.
+
+Final WebGL startup confirms `SCENE_AA FXAA`, with no graphics/render warnings or errors (only the expected unavailable debug HTTP bridge). The saved 1280×720 frozen capture measured 15.3 FPS, 65.3ms mean / 117.7ms p95 over 600 RAF samples. The scene remains below 30 FPS on HD530. Evidence: `artifacts/sampling/browser/`.

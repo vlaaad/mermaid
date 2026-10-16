@@ -4,3 +4,6 @@ vertex_program: "/render/blit.vp"
 fragment_program: "/render/present.fp"
 vertex_space: VERTEX_SPACE_LOCAL
 samplers { name: "scene_texture" wrap_u: WRAP_MODE_CLAMP_TO_EDGE wrap_v: WRAP_MODE_CLAMP_TO_EDGE filter_min: FILTER_MODE_MIN_LINEAR filter_mag: FILTER_MODE_MAG_LINEAR }
+
+fragment_constants { name: "screen_size" type: CONSTANT_TYPE_USER }
+fragment_constants { name: "antialias" type: CONSTANT_TYPE_USER }
