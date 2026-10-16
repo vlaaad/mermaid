@@ -546,10 +546,14 @@ def main():
     ray().save('ray','ray')
     mermaid().save('mermaid','mermaid')
     ground=Mesh()
-    for z in range(-125,21,4):
-        for x in range(-60,61,4):
+    # Keep the existing detailed floor; coarse outer strips hide its rectangle
+    # beyond the400m far plane, including orbit views at the travel boundaries.
+    ground_x=[-600,*range(-60,65,4),600]
+    ground_z=[-600,*range(-125,24,4),600]
+    for z,z_next in zip(ground_z,ground_z[1:]):
+        for x,x_next in zip(ground_x,ground_x[1:]):
             def p(xx,zz): return (xx,-4.25+.13*math.sin(xx*.3)*math.cos(zz*.19),zz)
-            ground.quad(p(x,z),p(x,z+4),p(x+4,z+4),p(x+4,z),(.19,.42,.48))
+            ground.quad(p(x,z),p(x,z_next),p(x_next,z_next),p(x_next,z),(.19,.42,.48))
     ground.save('seabed','sand')
     surface=Mesh()
     surface.quad((-1000,50,200),(1000,50,200),(1000,50,-1000),(-1000,50,-1000),(.12,.64,.83))

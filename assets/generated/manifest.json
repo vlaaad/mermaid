@@ -110,10 +110,10 @@
     "source": "assets/source/mermaid.blend"
   },
   "seabed": {
-    "triangles": 2294,
-    "vertices": 6882,
-    "unindexed_vertices": 6882,
-    "bytes": 359100
+    "triangles": 2574,
+    "vertices": 7722,
+    "unindexed_vertices": 7722,
+    "bytes": 402784
   },
   "surface": {
     "triangles": 2,
