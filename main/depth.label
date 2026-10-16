@@ -9,4 +9,4 @@ blend_mode: BLEND_MODE_ALPHA
 line_break: false
 text: ""
 font: "/builtins/fonts/default.font"
-material: "/builtins/fonts/label.material"
+material: "/builtins/fonts/label-df.material"

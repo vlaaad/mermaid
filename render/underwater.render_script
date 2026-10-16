@@ -19,7 +19,7 @@ function init(self)
     self.casters={}
     for _,category in ipairs({0,1,2,3,6,8}) do self.casters[category]=render.predicate({"caster"..category}) end
     self.shadow_constants=render.constant_buffer()
-    self.text=render.predicate({"text"})
+    self.text=render.predicate({"tile"})
     self.blit=render.predicate({"blit"})
     self.view=vmath.matrix4_look_at(vmath.vector3(0,7,13),vmath.vector3(0,6,-13),vmath.vector3(0,1,0))
     self.constants=render.constant_buffer()
@@ -228,6 +228,11 @@ function update(self)
     render.set_view(vmath.matrix4())
     render.set_projection(vmath.matrix4_orthographic(0,1280,0,720,-1,1))
     render.draw(self.text)
+end
+
+function on_reload(self)
+    self.text=render.predicate({"tile"})
+    self.shadow_valid=false
 end
 
 function on_message(self,id,message)
