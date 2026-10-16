@@ -406,6 +406,10 @@ def mermaid():
         m.tube([(side*.31,1.08,-.01),(side*.33,1.34,-.20),(side*.30,1.14,-.43)],[.019]*3,(.17,.41,.32),8)
     # Full hips transition into an S-shaped muscular tail, then a narrow peduncle.
     centers=[(0,.14,.065),(.025,-.13,.16),(.015,-.43,.32),(-.06,-.72,.52),(-.15,-1.00,.72),(-.24,-1.24,.91),(-.27,-1.45,1.07),(-.21,-1.61,1.18)]
+    # Shorten the lower taper into the raised fin attachment; hips stay fixed.
+    fin_root=vec((-.18288788,-1.24531108,1.18))
+    root_shift=fin_root-vec((-.21,-1.59,1.18))
+    centers=[vec(p)+root_shift*max(0,(i-4)/3) for i,p in enumerate(centers)]
     radii=[(.355,.25),(.405,.275),(.385,.265),(.315,.225),(.245,.18),(.165,.125),(.10,.08),(.07,.055)]
     m.tube(centers,radii,(.045,.57,.52,.25),40)
     # Two swept, pointed lobes. Curved outlines replace straight triangular fans.
@@ -421,7 +425,13 @@ def mermaid():
             offset=vec((side*edge[0]*(1.35 if side<0 else 1.0),edge[1]*(1.60 if side<0 else 1.08),edge[2]+side*edge[0]*.15))
             angle=-.25
             offset[0],offset[1]=math.cos(angle)*offset[0]-math.sin(angle)*offset[1],math.sin(angle)*offset[0]+math.cos(angle)*offset[1]
-            q=vec((-.21,-1.59,1.18))+offset*v
+            # Authored flukes: narrower left lobe, right lobe swept leftward.
+            # Real mesh coordinates, shared by normals and moving/swimming views.
+            if side<0:
+                offset[0]*=.79421564;offset[1]*=1.08874023
+            else:
+                offset[0]+=offset[1]*.37656321;offset[1]*=1.02304932
+            q=fin_root+offset*v
             q[2]+=.10*math.sin(v*math.pi)*math.sin(u*math.pi)+.018*math.sin(u*math.pi*24)*v*v
             return q
         def fn(u,v):
