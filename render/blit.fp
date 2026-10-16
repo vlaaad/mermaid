@@ -5,10 +5,11 @@ uniform mediump sampler2D scene_texture;
 uniform highp sampler2D scene_depth;
 uniform mediump sampler2D water_texture;
 uniform fs_uniforms { mediump vec4 screen_size; mediump vec4 visual_debug; };
-float linearDepth(float d){return .15*180.0/(180.0-d*(180.0-.15));}
+float linearDepth(float d){return .15*400.0/(400.0-d*(400.0-.15));}
 void main() {
     vec2 uv=vec2(var_uv.x,1.0-var_uv.y);
     vec3 color=texture(scene_texture,uv).rgb;
+    if(visual_debug.x>4.5){out_fragColor=vec4(color,1.0);return;}
     float z=linearDepth(texture(scene_depth,uv).r);
     float contact=0.0;
     for(int i=0;i<8;i++) {

@@ -1,5 +1,6 @@
 name: "dust"
 tags: "reef"
+tags: "reefthin"
 vertex_program: "/render/underwater.vp"
 fragment_program: "/render/underwater.fp"
 vertex_space: VERTEX_SPACE_LOCAL
@@ -16,3 +17,7 @@ samplers { name: "caustics" wrap_u: WRAP_MODE_REPEAT wrap_v: WRAP_MODE_REPEAT fi
 
 fragment_constants { name: "light_matrix" type: CONSTANT_TYPE_USER_MATRIX4 }
 samplers { name: "sun_depth" wrap_u: WRAP_MODE_CLAMP_TO_EDGE wrap_v: WRAP_MODE_CLAMP_TO_EDGE filter_min: FILTER_MODE_MIN_NEAREST filter_mag: FILTER_MODE_MAG_NEAREST }
+
+samplers { name: "stone_detail" wrap_u: WRAP_MODE_REPEAT wrap_v: WRAP_MODE_REPEAT filter_min: FILTER_MODE_MIN_LINEAR_MIPMAP_LINEAR filter_mag: FILTER_MODE_MAG_LINEAR }
+
+fragment_constants { name: "visual_debug" type: CONSTANT_TYPE_USER }

@@ -1,0 +1,13 @@
+{
+  "main_pillar": {"box": [0.563, 0.142, 0.044, 0.292], "min_row_coverage": 0.65},
+  "left_front_pillar": {"box": [0.406, 0.283, 0.038, 0.202], "min_row_coverage": 0.60},
+  "left_rear_pillar": {"box": [0.437, 0.322, 0.027, 0.170], "min_row_coverage": 0.60},
+  "pillar_behind_main": {"box": [0.611, 0.255, 0.026, 0.189], "min_row_coverage": 0.60},
+  "ring_left_pillar": {"box": [0.632, 0.180, 0.030, 0.260], "min_row_coverage": 0.60},
+  "right_rear_pillar": {"box": [0.842, 0.100, 0.027, 0.260], "min_row_coverage": 0.55},
+  "left_distant_pillar": {"box": [0.335, 0.350, 0.025, 0.130], "min_row_coverage": 0.35},
+  "left_distant_pillar_pair": {"box": [0.363, 0.340, 0.025, 0.140], "min_row_coverage": 0.35},
+  "central_distant_pillar": {"box": [0.456, 0.405, 0.020, 0.105], "min_row_coverage": 0.40},
+  "temple_left_pillar": {"box": [0.701, 0.021, 0.026, 0.225], "min_row_coverage": 0.60},
+  "temple_right_pillar": {"box": [0.770, 0.000, 0.032, 0.220], "min_row_coverage": 0.60}
+}

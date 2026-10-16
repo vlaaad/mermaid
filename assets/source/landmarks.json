@@ -1,0 +1,230 @@
+[
+  {
+    "id": "main_pillar",
+    "asset": "column",
+    "reference_anchor_uv": [
+      0.582,
+      0.43
+    ],
+    "world_position": [
+      8.114953836701046,
+      7.987068721250116,
+      -38.12895968529965
+    ],
+    "scale": [
+      1.15,
+      1.88,
+      1.15
+    ],
+    "depth_m": 51
+  },
+  {
+    "id": "left_front_pillar",
+    "asset": "column",
+    "reference_anchor_uv": [
+      0.423,
+      0.48
+    ],
+    "world_position": [
+      -7.891874070525076,
+      5.16076108836511,
+      -36.015982888657014
+    ],
+    "scale": [
+      0.85,
+      1.25,
+      0.85
+    ],
+    "depth_m": 49
+  },
+  {
+    "id": "left_rear_pillar",
+    "asset": "column",
+    "reference_anchor_uv": [
+      0.447,
+      0.49
+    ],
+    "world_position": [
+      -6.990892942794602,
+      4.060464660664543,
+      -49.976521773876534
+    ],
+    "scale": [
+      0.7,
+      1.4,
+      0.7
+    ],
+    "depth_m": 63
+  },
+  {
+    "id": "left_distant_pillar",
+    "asset": "column",
+    "reference_anchor_uv": [
+      0.347,
+      0.48
+    ],
+    "world_position": [
+      -21.498782784513153,
+      4.606008879534542,
+      -56.04067222832413
+    ],
+    "scale": [
+      0.65,
+      1.12,
+      0.65
+    ],
+    "depth_m": 69
+  },
+  {
+    "id": "left_distant_pillar_pair",
+    "asset": "column",
+    "reference_anchor_uv": [
+      0.375,
+      0.48
+    ],
+    "world_position": [
+      -19.35848500840857,
+      4.411845606443843,
+      -63.03550408899843
+    ],
+    "scale": [
+      0.6,
+      1.35,
+      0.6
+    ],
+    "depth_m": 76
+  },
+  {
+    "id": "central_distant_pillar",
+    "asset": "column",
+    "reference_anchor_uv": [
+      0.465,
+      0.51
+    ],
+    "world_position": [
+      -6.009639850466393,
+      1.4653470731007745,
+      -68.86791268136517
+    ],
+    "scale": [
+      0.4,
+      1.0,
+      0.4
+    ],
+    "depth_m": 82
+  },
+  {
+    "id": "pillar_behind_main",
+    "asset": "column",
+    "reference_anchor_uv": [
+      0.624,
+      0.44
+    ],
+    "world_position": [
+      14.938285628830073,
+      7.585380415299738,
+      -48.107777121029564
+    ],
+    "scale": [
+      0.82,
+      1.5,
+      0.82
+    ],
+    "depth_m": 61
+  },
+  {
+    "id": "ring_left_pillar",
+    "asset": "column",
+    "reference_anchor_uv": [
+      0.646,
+      0.43
+    ],
+    "world_position": [
+      18.525079063850715,
+      8.36105188549034,
+      -51.143512682388334
+    ],
+    "scale": [
+      0.85,
+      2.14,
+      0.85
+    ],
+    "depth_m": 64
+  },
+  {
+    "id": "right_rear_pillar",
+    "asset": "column",
+    "reference_anchor_uv": [
+      0.855,
+      0.36
+    ],
+    "world_position": [
+      64.76906157549145,
+      16.336592729486508,
+      -78.48732550047762
+    ],
+    "scale": [
+      1.2,
+      3.1,
+      1.2
+    ],
+    "depth_m": 91
+  },
+  {
+    "id": "central_gateway",
+    "asset": "arch",
+    "reference_anchor_uv": [
+      0.536,
+      0.555
+    ],
+    "world_position": [
+      3.915811247334473,
+      -0.00485992086005238,
+      -44.74343680528932
+    ],
+    "scale": [
+      0.83,
+      0.9,
+      0.83
+    ],
+    "depth_m": 58
+  },
+  {
+    "id": "ring_gateway",
+    "asset": "arch",
+    "reference_anchor_uv": [
+      0.701,
+      0.515
+    ],
+    "world_position": [
+      26.41807453457032,
+      2.078665478622174,
+      -52.81360871320744
+    ],
+    "scale": [
+      1.55,
+      1.55,
+      1.55
+    ],
+    "depth_m": 66
+  },
+  {
+    "id": "circular_window",
+    "asset": "ring",
+    "reference_anchor_uv": [
+      0.701,
+      0.245
+    ],
+    "world_position": [
+      26.420105234165835,
+      22.21724212730723,
+      -53.82866613083735
+    ],
+    "scale": [
+      1.5,
+      1.5,
+      1.5
+    ],
+    "depth_m": 66
+  }
+]

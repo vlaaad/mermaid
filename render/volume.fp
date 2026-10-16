@@ -15,7 +15,7 @@ vec3 worldAt(vec2 uv,float depth) {
     vec4 p=inverse_view_projection*vec4(uv*2.0-1.0,depth*2.0-1.0,1.0);
     return p.xyz/p.w;
 }
-float linearDepth(float d){return .15*180.0/(180.0-d*(180.0-.15));}
+float linearDepth(float d){return .15*400.0/(400.0-d*(400.0-.15));}
 float sunVisible(vec3 p) {
     vec4 l=light_matrix*vec4(p,1.0);
     vec3 q=l.xyz/l.w*.5+.5;
@@ -41,17 +41,17 @@ void main() {
     for(int i=0;i<32;i++) {
         float d=(float(i)+jitter)*stride;
         vec3 p=camera_pos.xyz+dir*d;
-        vec2 surface=p.xz+(42.0-p.y)*vec2(.389,-.267);
+        vec2 surface=p.xz+(50.0-p.y)*vec2(.389,-.267);
         vec2 wave=vec2(sin(surface.y*.35+time_data.x*.11),cos(surface.x*.29-time_data.x*.09))*.6;
         vec2 s=surface+wave;
-        vec2 a=(s-vec2(15.0,-37.0))/vec2(1.5,8.0);
-        vec2 b=(s-vec2(28.0,-55.0))/vec2(2.2,10.0);
-        vec2 c=(s-vec2(3.0,-29.0))/vec2(1.25,7.0);
-        vec2 e=(s-vec2(17.0,-18.0))/vec2(1.8,7.5);
+        vec2 a=(s-vec2(18.1,-39.2))/vec2(1.5,8.0);
+        vec2 b=(s-vec2(31.1,-57.2))/vec2(2.2,10.0);
+        vec2 c=(s-vec2(6.1,-31.2))/vec2(1.25,7.0);
+        vec2 e=(s-vec2(20.1,-20.2))/vec2(1.8,7.5);
         float aperture=exp(-dot(a,a))+exp(-dot(b,b))*.8+exp(-dot(c,c))*.7+exp(-dot(e,e))*.6;
         float filaments=.72+.20*sin(s.x*5.2+s.y*.65+time_data.x*.13)+.08*sin(s.x*11.0+s.y*.35);
         aperture*=filaments;
-        float water=smoothstep(-6.0,-3.5,p.y)*(1.0-smoothstep(41.0,43.0,p.y));
+        float water=smoothstep(-6.0,-3.5,p.y)*(1.0-smoothstep(49.0,51.0,p.y));
         scatter+=(.025+aperture)*sunVisible(p)*water*exp(-d*.027)*stride;
     }
     float forward=.75+pow(max(dot(dir,normalize(vec3(.35,.90,-.24))),0.0),3.0)*1.7;

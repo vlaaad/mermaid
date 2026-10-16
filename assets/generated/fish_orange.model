@@ -1,0 +1,7 @@
+mesh: "/assets/generated/fish_orange.glb"
+materials {
+ name: "reef"
+ material: "/render/fish.material"
+ textures { sampler: "caustics" texture: "/assets/generated/caustics.png" }
+ textures { sampler: "stone_detail" texture: "/assets/textures/limestone-v1.png" }
+}

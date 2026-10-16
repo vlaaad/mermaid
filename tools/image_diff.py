@@ -68,6 +68,8 @@ def metrics(first, second, pixel_threshold=10):
         "rgb_mae_percent": float(error.mean() * 100),
         "ssim_rgb": ssim,
         "changed_pixels_percent": float((error > pixel_threshold / 255).mean() * 100),
+        "black_pixels_percent": float(np.all(a == b, axis=2).mean() * 100),
+        "within_tolerance_pixels_percent": float((np.max(np.abs(np.asarray(first, dtype=np.int16) - np.asarray(second, dtype=np.int16)), axis=2) <= pixel_threshold).mean() * 100),
     }, error
 
 
@@ -90,7 +92,7 @@ def difference_image(first, second):
     return Image.fromarray(np.rint(255 * error ** DIFF_GAMMA).astype(np.uint8))
 
 
-def comparison_image(reference, candidate):
+def comparison_image(reference, candidate, pixel_threshold=10):
     """One error map; the two source previews provide context above it."""
     w, h = reference.size
     sheet = Image.new("RGB", (2 * w, 3 * h + 2 * LABEL_HEIGHT + FOOTER_HEIGHT), "#101827")
@@ -104,10 +106,14 @@ def comparison_image(reference, candidate):
     sheet.paste(reference, (0, LABEL_HEIGHT))
     sheet.paste(candidate, (w, LABEL_HEIGHT))
     y = h + LABEL_HEIGHT
-    draw.text((12, y + 10), "RGB DIFFERENCE - black: equal / brighter: larger difference", font=font, fill="white")
+    diff = difference_image(reference, candidate)
+    black = (np.asarray(diff) == 0).mean() * 100
+    delta=np.abs(np.asarray(reference,dtype=np.int16)-np.asarray(candidate,dtype=np.int16))
+    near=(np.max(delta,axis=2)<=pixel_threshold).mean()*100
+    draw.text((12, y + 10), f"RGB DIFFERENCE - black: equal / brighter: larger error | exact black: {black:.4f}% | within {pixel_threshold:g}/channel: {near:.2f}%", font=font, fill="white")
     # Nearest-neighbor enlargement preserves the exact error pixels, without
     # introducing interpolation/blending into the difference panel.
-    diff = difference_image(reference, candidate).resize((2 * w, 2 * h), Image.Resampling.NEAREST)
+    diff = diff.resize((2 * w, 2 * h), Image.Resampling.NEAREST)
     sheet.paste(diff, (0, y + LABEL_HEIGHT))
     y = sheet.height - FOOTER_HEIGHT
     draw.text((12, y + 6), "All RGB channels contribute, including color changes with equal brightness. Fixed square-root contrast boost.", font=font, fill="white")
@@ -144,14 +150,14 @@ def compare(reference_path, candidate_path, output, *, width=960, fit="strict", 
         "metric_version": 1,
         "reference": {"path": str(Path(reference_path).resolve()), "sha256": hashlib.sha256(Path(reference_path).read_bytes()).hexdigest(), "size": list(original_ref.size)},
         "candidate": {"path": str(Path(candidate_path).resolve()), "sha256": hashlib.sha256(Path(candidate_path).read_bytes()).hexdigest(), "size": list(original_candidate.size)},
-        "settings": {"analysis_size": list(ref.size), "fit": fit, "aspect_ratio_error_percent": aspect_error * 100, "pixel_threshold_rgb_levels": pixel_threshold, "blur_sigma_pixels": sigma, "ssim": "RGB mean, 7x7 uniform window, sample covariance, K1=.01 K2=.03, border excluded", "alpha": "composite on black", "color": "encoded RGB; no exposure, alignment, warp, or color matching"},
+        "settings": {"analysis_size": list(ref.size), "fit": fit, "aspect_ratio_error_percent": aspect_error * 100, "pixel_threshold_rgb_levels": pixel_threshold, "tolerance_coverage": "every RGB channel differs by at most pixel_threshold_rgb_levels; separate milestone, never thresholds the difference image", "blur_sigma_pixels": sigma, "ssim": "RGB mean, 7x7 uniform window, sample covariance, K1=.01 K2=.03, border excluded", "alpha": "composite on black", "color": "encoded RGB; no exposure, alignment, warp, or color matching"},
         "visualization": {"version": 4, "image": "diff.png", "layout": "reference and game capture side by side above ONE difference panel", "difference": "RGB root-mean-square distance (not grayscale input)", "display_curve": "255 * sqrt(sqrt(mean(((reference RGB - capture RGB) / 255)^2)))", "difference_display_scale": "2x nearest-neighbor", "scale": "fixed across runs; equal=black, larger error=brighter, maximum error=white; no clipping or per-image normalization"},
         "metrics": scores, "regions": regional,
         "mae_gate": None if max_mae is None else {"limit_percent": max_mae, "passed": scores["rgb_mae_percent"] <= max_mae},
         "warnings": ["Aspect ratios differ: candidate was letterboxed, not cropped or stretched."] if aspect_error > 0.005 else [],
     }
     output.mkdir(parents=True, exist_ok=True)
-    comparison_image(ref, candidate).save(output / "diff.png")
+    comparison_image(ref, candidate, pixel_threshold).save(output / "diff.png")
     (output / "metrics.json").write_text(json.dumps(report, indent=2) + "\n")
     # This tool reserves these legacy output names. Remove obsolete reports so
     # the directory presents one current review image, not stale visualizations.

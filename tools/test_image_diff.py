@@ -19,6 +19,7 @@ class ImageDiffTests(unittest.TestCase):
         self.assertEqual(scores["rgb_mae_percent"], 0)
         self.assertAlmostEqual(scores["ssim_rgb"], 1, places=10)
         self.assertEqual(scores["changed_pixels_percent"], 0)
+        self.assertEqual(scores["black_pixels_percent"], 100)
 
     def test_black_white_has_max_color_error_and_known_ssim(self):
         scores, _ = metrics(Image.new("RGB", (20, 20), "black"), Image.new("RGB", (20, 20), "white"))
@@ -34,6 +35,18 @@ class ImageDiffTests(unittest.TestCase):
         scores, _ = metrics(a, b)
         self.assertAlmostEqual(scores["rgb_mae_percent"], 100 / 400)
         self.assertAlmostEqual(scores["changed_pixels_percent"], 100 / 400)
+        self.assertAlmostEqual(scores["black_pixels_percent"], 100 * 399 / 400)
+
+    def test_tolerance_requires_each_channel_and_does_not_blacken_diff(self):
+        a = Image.new("RGB", (20, 20), (100, 100, 100))
+        b = Image.new("RGB", (20, 20), (110, 100, 90))
+        scores, _ = metrics(a, b)
+        self.assertEqual(scores["within_tolerance_pixels_percent"], 100)
+        self.assertEqual(scores["black_pixels_percent"], 0)
+        self.assertGreater(difference_image(a, b).getpixel((0, 0)), 0)
+        b.paste((111, 100, 100), (0, 0, 10, 20))
+        scores, _ = metrics(a, b)
+        self.assertEqual(scores["within_tolerance_pixels_percent"], 50)
 
     def test_inverted_checkerboard_has_negative_structural_similarity(self):
         checker = (np.indices((32, 32)).sum(axis=0) % 2).astype(float)

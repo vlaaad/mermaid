@@ -1,141 +1,97 @@
 # Agent working memory — Mermaid
 
-## Objective and constraints
-- Build the actual controllable 3D scene as close as practical to `Blonde-Mermaid-in-Atlantis-Ruins.png`.
-- Desktop + browser, keyboard/mouse. 30 FPS is sufficient on this old laptop. Prioritize reference look and feel; use profiling to catch regressions, not chase 60 FPS. Share/instance meshes; NEVER bake fish, rays, vegetation, or other future actors into scenery.
-- README is agent memory: maintain concrete state, commands, pitfalls, measurements, and next work as the project evolves. Do not rewrite as marketing/user documentation.
-- User authorizes local Git commits. Repository now exists; user supplied initial/prep commits b090512 and 2a54da5. Preserve their work and commit our scene separately.
-- Do not flatten the reference into a backdrop to improve the diff. The opening frame must come from the playable 3D world.
+## Goal and working rules
 
-## Environment / access
-- CWD `/home/vlaaad/Projects/mermaid`; running Defold 1.14.0 at `http://127.0.0.1:$(cat .internal/editor.port)`.
-- `.internal/editor.token` is a secret local bearer token for `/eval` and `/bob`; do not print it.
-- Running editor HTTP + engine + Blender Snap require unsandboxed execution here. Use `exec_command` escalation for these; don't launch another editor unnecessarily.
-- Blender 5.2.2 LTS: `/snap/bin/blender` works outside sandbox. Meshes are glTF/GLB and editable there.
-- Official builtins/shaders and protobuf classes are in `/opt/Defold/packages/defold-a81dbb0478e8b73931dc2d671563204f6ac0ef82.jar`. Read the installed source/schema first instead of guessing APIs.
-- System Python includes Pillow + NumPy. No SciPy/skimage needed by project tools.
+- Build a real interactive 3D underwater mermaid scene matching `Blonde-Mermaid-in-Atlantis-Ruins.png`: lighting, composition, level, models, textures and movement. Desktop/browser, keyboard/mouse. Old Intel HD530 laptop; ~30FPS is sufficient. Appearance first, profile meaningful regressions.
+- User's latest direction: **ONE visual element per fitting pass.** Freeze camera, geometry, pose/time and all unrelated settings. Match a specific element, inspect a real capture, then move on. Do not mix model/layout/lighting/palette/performance edits.
+- Work remains far from the visual target. The near-black diff/90% target is UNMET. Never describe average RGB error as a fidelity percentage. Similar blue water must not count as a missing blue column: verify actual geometry separately.
+- All actors stay independent/shared-mesh instances, including fish, rays and vegetation. No actor baking or reference-image backdrop/projection. Static geometry and shaders must survive swimming/camera orbit.
+- README is agent memory, not user marketing. Maintain commands, current evidence, pitfalls and next work. User authorizes local Git commits. Preserve their commits/work.
 
-## Current implementation (update after verification)
-- `tools/build_assets.py`: deterministic seed 73 geometry/layout generator. Y-up, meters, forward -Z. Emits vertex-colored GLBs, `.model`/`.go` resources, `main/world.collection`, `main/obstacles.lua`, and `assets/generated/manifest.json`.
-- Geometry authored procedurally: 4 shared rock variants, fluted column, segmented arch, circular ruin, kelp cluster, coral/sponges, fish/ray, mermaid, seabed, surface, particles.
-- Current generated world instances + player are recorded in `assets/generated/manifest.json` (vegetation/fish geometry reduced after profiling). Broad cliffs are instanced rocks; fish and kelp share meshes/materials. Static indexed primitives are not required; current generated GLBs use explicit triangles.
-- `render/underwater.*`: perspective custom render pass, local-space instanced world-matrix shader, vertex colors, per-category vertex animation, shared cellular caustics texture, soft sun shadows, hemisphere/sand bounce fill, depth fog, and depth-aware volumetric water (no shaft cards).
-- `main/main.script`: inertial swimming, camera-relative WASD, rise Space/E, dive Ctrl/Q, Shift boost, mouse drag orbit, R reset, P profiler; sphere/AABB sliding and a broad-phase-filtered segment/AABB camera arm test with stationary caching. Architecture is collidable (197 terrain/column/arch/ring boxes).
-- Display 1280x720, high_dpi=0 to avoid uncontrolled DPR cost. Scene uses perspective 59deg vertical FOV.
-- Scene renders on native and WebGL. Do not call it a close art match yet: mermaid art, rock variation, and composition remain visibly simpler than reference.
+## Current checkpoint — native pass33, 2026-10-16
 
-## Run / capture / inspect
-One command, no required arguments:
+- Actual captures/metrics/diffs: `artifacts/progress/pass27` through `pass32`. Latest33 MAE12.0267%, SSIM.40318, exact-black.0007716%, within10/channel5.9167%. These are diagnostics, NOT a close match. Baseline4: MAE11.8649%, SSIM.48805, tolerance4.4477%; structural similarity is still worse than baseline.
+- Caustic-only passes27→30: gain.22→.66→1.20; then stone response.35 while sand stays1.20. Pattern size/color/motion unchanged. Constants `CAUSTIC_GAIN` and `STONE_CAUSTIC_RESPONSE` in underwater.fp.
+- Clear seabed sample at960analysis: pixels(581,443)-(614,516). Reference display-luminance p10/50/90=.4409/.5377/.6604. Gain.22=.4583/.4821/.5120; gain.66=.4611/.4927/.5757; gain1.20=.4613/.5002/.6529. This fits bright seabed caustics, not their shape/color or every receiving surface. Recheck after other lighting/material changes.
+- Sea-color-only passes30→32: bottom/view-ray fog RGB(.050,.49,.86), top(.065,.61,1.0); density remains.016. Same fog function for background and objects. No camera/geometry/caustic changes.
+- Clear middle water box[x.495,y.37,x2.52,y2.42]: reference medianRGB(.1137,.6118,.9373), pass30(.0980,.5255,.7882), pass32(.1137,.6078,.9412). Upper box[.51,.17,.55,.23]: reference(.1922,.6863,.9686),32(.1804,.6824,.9490). Middle now within1 RGB level/channel, upper within5. These local results are not whole-image fidelity; patches still differ in gradients/texture.
+- Mermaid-position-only pass32→33: model component local offset(.20,-.22,0), maintained by generator. Physical spawn, camera, geometry, pose and lighting unchanged; head/body shift slightly right/down toward reference. Tail shape still wrong.
+- Current models: fuller curved tail, asymmetric swept flukes, continuous Blender-finished skin, curled hair, hollow sponges, branching coral, broad ribbon-kelp, curved two-sided manta, independent orange/silver/gold/blue fish. Detailed beveled/eroded architectural meshes. Warm sunlight/transmitted leaf light and cooler ambient shade.
+- Render: normal opaque depth-tested pass, NO depth prepass.1024² sun shadow map/4PCF taps; quarter-res32step water scattering, depth-aware upsample/contact shading. Geometry AND post capped1280×720, then one-sample upscale to physical framebuffer. Far400, surfaceY50/plane±1000, ripple contrast fades90–180m, haze165–300m.
+- Shared GLBs now indexed by FULL float32 vertex tuple, preserving hard normals/UV seams/color IDs/triangle order. Kelp2016→900vertices, coral10584→4284, fish486→120. Expanded-index reconstruction asserted exact. Actual capture before/after indexing99.8358% pixel-identical, mean difference.001277 RGB levels.
+- Native pass24 profile(before extra columns): Frame37.51ms mean/p9585.03,71draws. Pass27:53.51/p9595.86,78draws. Do not claim30FPS or browser performance from native results. Current native movement/boost/rise/orbit checks PASS: W5.029m, boost8.936m(1.777x), rise3.670m, orbit1.286rad. Frame40.657ms mean/p9586.924,78draws. Browser pass32 rebuilt successfully, actual1280×720 canvas:504RAF samples,20.54FPS,48.690ms mean/p95100ms, no console warnings/errors. Evidence artifacts/progress/browser-pass32/. Browser W unfreezes and moves the player. Bundle still32 until next rebuild.
+
+## Geometry presence audit
+
+- `mermaid.lighting {mode:5}` renders actual visible column/arch/window geometry WHITE, all other visible geometry/water BLACK, preserving depth occlusion. No fog/post color. Restore mode0 afterwards. Debug IDs are vertex alpha: columns.1, arches.2, ring.3 under stone params0; normal output stays OPAQUE alpha1.
+- `tools/reference_structure.json`:11 coarse hand-marked required-column regions. `tools/structure_check.py` rejects ordinary colored captures, checks visible area/vertical span. It is a presence audit, not proof of correct silhouette/detail; neighboring masonry can overlap boxes. Inspect mask and normal capture too.
+- Added/corrected real main/left pair/behind-main/ring-left/right-rear columns and temple lintel. Stable landmark GO names/transforms: `assets/source/landmarks.json`.
+- Current audit still flags `left_distant_pillar`, `left_distant_pillar_pair`, `central_distant_pillar` as missing/occluded. Do not hide this by fog/color adjustment. Their visibility/placement is a later isolated geometry task.
+
+## Run, capture, compare
+
 ```bash
 python3 tools/capture_diff.py
+python3 tools/capture_diff.py --output artifacts/progress/pass33 --profile
+python3 -m unittest tools.test_image_diff tools.test_structure_check -q
+python3 tools/playtest.py
 ```
-- Reuses/starts the editor, builds/launches a native game, waits for `mermaid.ready`, freezes the opening at time3, warms30 frames, captures full resolution, exits the game, THEN runs the image comparison. The editor stays open. Game cleanup runs even if capture fails.
-- Outputs `artifacts/image-diff/capture.png` (original screenshot), `capture.json` (state/framebuffer), and ONE review image `diff.png` (reference + screenshot across the top, ONE RGB difference panel below), plus `metrics.json` for diagnostic numbers. No HTML or overlay. Paths default relative to the repository, so the script also works when invoked from another directory.
-- Optional `--output DIRECTORY`, `--reference IMAGE`, `--max-mae-percent 4`. No color-error gate by default; successful workflow exits0. Explicit gate failure exits1; build/capture/comparison failure exits2. Never interpret color MAE as a visual-fidelity percentage.
 
-```
+- NO required arguments. Reuse/start editor → build/run native → ready → freeze openingtime3 → warm30frames → normal capture → semantic architecture mask/audit → exit engine → ONE RGB diff PNG. Editor stays open. Engine cleanup also runs on failure.
+- Default output `artifacts/image-diff/`: `capture.png`+`capture.json`, debug `structure-mask.png`+`structure.json`, **ONE difference** `diff.png`, `metrics.json`. Mask/capture are source/debug evidence, not extra diffs. No HTML/overlay/extra heatmap.
+- Diff PNG top=reference+game side by side; bottom=one grayscale RGB RMS error. Inputs NOT converted to grayscale: delta=(refRGB-gameRGB)/255; error=sqrt(mean(delta²)); displayed gray=round(255*sqrt(error)). Fixed curve, exact-equal black; larger error brighter. Never threshold/normalize/grade the diff to satisfy the target.
+- Fixed960px analysis width, strict aspect within.5%, LANCZOS resize. No alignment/crop/warp/color fitting. Diff bottom enlarged2x NEAREST. Normal1920×1760 review sheet.
+- `black_pixels_percent` is exact RGB equality after fixed analysis. `within_tolerance_pixels_percent` means EVERY channel differs≤10/255; easier intermediate milestone, never changes error pixels. Changed-pixel metric is a different historical measure(mean RGB error>10). MAE=mean absolute RGB error/255; RGB SSIM7×7/sample covariance; blur diagnostic only.
+- Optional `--reference`, `--output`, `--max-mae-percent4`(explicit MAE-only gate), `--profile`(90 Main-thread frames→profile.json). Default0=workflow success,1=explicit MAE gate failed,2=real error. Do not equate workflow success with art acceptance.
+-16 known-value tests cover RGB-only color changes, one unblended diff, strict/tolerance separation, aspect, and geometry-vs-blue-water presence checks.
+- Playtest checks capture stability, W/boost/rise/orbit and native profiler. It closes engines it launches; `--attach` only disconnects. Frozen repeat showed16pixels(max6levels) changing over3.7M, frozen simulation state unchanged. Stability test allows≤8levels at≤.01%pixels and requires identical frozen state; reports exact equality separately. The reference diff remains STRICT.
+
+## Source and asset authoring
+
+```bash
 python3 tools/build_assets.py
-python3 tools/automation.py --build --focus --key W --hold 0.5
-python3 tools/automation.py --build --focus --profile 120 --scale 1
 ```
-- Wrapper: pinned Automation Bridge 2.5.0; copied managed `automation-bridge-python/`. Do not edit wrapper or store game code there. Import only package-root `editor`, `engine`.
-- Reuse editor: `PYTHONPATH=automation-bridge-python python3 ...`; `p=editor.open_project('.',start_if_needed=False)`.
-- Manually authored `.go`/`.collection` must be parsed via `p.preview.render(resource, resolution_multiplier=.5)` before building; native runtime is still the visual truth.
-- `g=p.build_and_run(focus=True,timeout=180)`; screenshots atomic: `shot=g.screenshot(after_frames=2)`; save `shot.read_bytes()`.
-- Use focus=True for profiler/control timings. Initial native graphics warmup/occlusion can throttle frames. `engine.run_while_iconified=1` is set; initial ready timeout45sec accounts for shader/OS warmup. Close the browser game while profiling native, and close native while profiling browser.
-- `g.close()` releases this client and leaves the engine running; `g.close_engine()` terminates it. Do not close an engine used by another session.
-- `g.command('mermaid.capture',{})` resets opening pose/camera/time=3 and freezes animation; `mermaid.resume` resumes. `mermaid.reset` takes `{freeze:bool}`. Any movement unfreezes.
-- `g.state('mermaid')` exposes ready, frozen, time, speed, position, camera, heading input, frame count and smoothed frame_ms. Guard Lua APIs with `if automation_bridge then`.
-- Current images: `artifacts/scene/opening.png` (authored scene), `artifacts/automation/latest.png` + `latest.json` (generic helper).
 
-## Browser path / profiling
-- Preferred build without launching a separate Firefox instance:
+- Deterministic seed73, Y-up meters, forward -Z. Emits shared GLBs/.model/.go, world.collection, obstacles.lua, manifest.json and named landmarks. Current counts in manifest; limits2048model/GO instances.
+- `assets/source/mermaid.blend`: editable current mesh. Raw/finished GLBs + signature cache alongside. `tools/finish_character.py` unions skin(.018voxel), smooths3, decimates.55, rejoins untouched hair/fins/clothing with UV/material IDs. `build_assets.py` runs Blender only if raw mesh/script changes; otherwise copies cached finishedGLB. No armature yet; swimming/hair/tail deformation is in the vertex shader.
+- Mermaid vertex alpha encodes skin0,tail.25,fluke.5,hair.75,garment1; preserve these IDs and active vertex colors when editing/exporting. Normal fragment alpha is ALWAYS1, not the ID.
+- `assets/source/ruins.blend`: column/arch/ring arranged side-by-side for editing. `tools/finish_ruins.py` welds, physically erodes.024, bevels.045/2segments, weighted normals, slight mottling; exports BEFORE display offsets. Finished triangles column5899/arch4626/ring4290. Cached raw/finishedGLBs/signature.
+- Manual Blender edits must export back to the relevant `*-finished.glb`, material `reef`, active vertex color/normals/UVs. For ruins export one object at a time with location reset to0(display offsets are not world placement). Cache uses raw generator/script signature: unchanged generation copies that finished file. Changing raw generator/script regenerates and replaces manual finished mesh, so preserve manual source revisions first.
+- Limestone bitmap/provenance is in assets/textures; reused only this asset from a rejected pass. No old palette fitting/prepass returned. Shared packed caustics texture R=receiving caustics,G=stone noise,B=water wave field.
+
+## Editor/bridge/browser commands
+
+- CWD `/home/vlaaad/Projects/mermaid`, Defold1.14.0. Editor `http://127.0.0.1:$(cat .internal/editor.port)`. `.internal/editor.token` is SECRET; never print. Editor/engine/BlenderSnap require execution escalation here. Reuse editor; avoid concurrent editor builds.
+- Blender5.2.2 `/snap/bin/blender`; system Python has Pillow+NumPy. Installed Defold sources/schema: `/opt/Defold/packages/defold-a81dbb0478e8b73931dc2d671563204f6ac0ef82.jar`. Read local API/schema before guessing.
+- Pinned Automation Bridge2.5.0 + managed wrapper automation-bridge-python. Do not edit wrapper. `PYTHONPATH=automation-bridge-python`.
+
 ```python
+from automation_bridge import editor
+p=editor.open_project('.',start_if_needed=False)
+g=p.build_and_run(focus=True,timeout=180)
+g.wait_for_state('mermaid.ready',True,timeout=45)
+g.command('mermaid.capture',{}) # freeze/reset opening; resume command unfreezes
+state=g.state('mermaid').value # NOT .data
+shot=g.screenshot(after_frames=2,timeout=30)
+# save shot.read_bytes(); g.screen() is actual framebuffer/window evidence
+profile=g.profiler.capture(frames=120,warmup_frames=5,thread='Main',timeout=45)
+g.close_engine(timeout=5) # g.close() alone leaves engine alive
 p.bob(options={'platform':'wasm-web','architectures':'wasm-web','archive':True,'variant':'debug',
-               'bundle-output':str((p.root/'artifacts/browser').resolve())},commands=('build','bundle'),timeout=240)
+              'bundle-output':str((p.root/'artifacts/browser').resolve())},
+      commands=('build','bundle'),timeout=240)
 ```
-- Bob must bundle OUTSIDE `build/` (reserved by Defold); the verified output is `artifacts/browser/mermaid/`. `p.build_and_run_html5(timeout=180)` remains a fallback but opens another Firefox tab and writes `build/default_html5/__htmlLaunchDir/mermaid/`.
-```
-python3 tools/serve.py
-```
-- Inspect `http://127.0.0.1:8765/` with CUA browser tools. Reload after each rebuild.
-- Bridge debug HTTP is unavailable in WebAssembly. Use browser UI input and screenshots. Game publishes `window.mermaidState` for dev inspection, not engine introspection via HTTP.
-- Native profiler: `g.profiler.capture(frames=120,warmup_frames=5,thread='Main',timeout=45)`, then `.scopes()`, `.counters()`, `g.profiler.resources()`. Always filter Main; otherwise '120 frames' includes profiler/worker threads.
-- P toggles built-in profiler UI. Browser runtime performance must be measured separately. Budget33.3ms; report p95/spikes and draw calls, not just average FPS. `?debug=1` shows a rolling600-sample RAF panel and state; `?capture=1` hides HUD/freezes opening time; `?width=1920` forces full-HD framebuffer; `?trace=1` enables Defold Performance Timeline scopes (profiling overhead, use only when recording).
 
-## Visual measurement
-```
-python3 tools/image_diff.py Blonde-Mermaid-in-Atlantis-Ruins.png artifacts/scene/opening.png --regions tools/reference_regions.json
-python3 -m unittest tools.test_image_diff -v
-```
-- Emits exactly one review image: `artifacts/image-diff/diff.png`: reference and capture side by side at the top, one grayscale RGB-error panel below. Hashes/settings/diagnostic numbers are in `metrics.json`. Old generated HTML, heatmap, highlighted overlay and comparison-sheet files are removed from the output directory.
-- Default analysis width960, matching aspect required within .5%. Explicit `--fit contain` letterboxes mismatch and records warning. Never silently crop/warp/grade to lower error.
-- RGB MAE = average absolute RGB channel error /255 x100. SSIM uses 7x7 sample covariance, RGB mean; best1, can be negative. Changed pixels default mean RGB error>10/255. Blurred MAE is only coarse palette/layout diagnostic.
-- `--max-mae-percent 10` is an optional MAE-only gate, not 90% fidelity. Global score can hide a missing small subject; check mermaid/ruin ROIs and actual images.
-- Empty black baseline at960x540: RGB MAE39.2437%, SSIM0.0021356. Reference self-check MAE0/SSIM1. Seven known-value tests pass.
-- Matching concept art below10% pixel MAE is a stretch/exploratory target, not promised. First prioritize camera composition, silhouettes, character, water/light. Once accepted, use actual rendered opening frame for tighter regression testing.
+- Bob output must be OUTSIDE build/(reserved). Verified destination artifacts/browser/mermaid. Avoid build_and_run_html5 unless necessary; it opens another Firefox instance. Console lines are strings: `p.console.read().lines`; check WARN/ERROR. Bob timeout: inspect console before retrying; operation may still be running.
+- `python3 tools/serve.py` → localhost8765, default Bob bundle. Existing detached server PID/log in artifacts/server.pid/server.log; check health before launching a duplicate.
+- Browser `/?debug=1&capture=1&width=1280`: frozen opening, actual1280×720 canvas, rolling600 RAF samples, renderer, **Save frame and timings** button→same-origin server capture→artifacts/scene/browser.png/browser-metrics.json. These are actual web captures; never substitute native. `?debug=1` live, movement unfreezes, `?trace=1` scopes adds overhead.
+- WebAssembly has no bridge debug HTTP. Use browser UI controls. Canvas locator `.press('w')` reaches controller; Tab.pressKey was unreliable. `display.update_frequency=0` for web RAF. Check native and browser separately with only one agent game renderer active; do not kill user browser processes.
 
-## Art direction / lighting checkpoint — 2026-10-15
-- User's latest priorities: old laptop, 30 FPS acceptable; focus on look/feel, not 60 FPS. Fish and other future actors must remain independent. Current layout: 571 independent instances, 197 collision boxes. No fish fields, static chunk baking, or shaft cards remain. Shared meshes still instance.
-- Compared reference against actual runtime. Primary deficits: uniform blue light, absent cast/contact shade, flat-looking ray planes, sparse material detail and simple procedural character/rocks. Lighting alone cannot close the geometry/art gap.
-- Render passes: 1024² sun depth map; opaque scene with 3×3 filtered sun shadows; quarter-resolution 32-step world-space water scattering; depth-aware 4-tap upsampling + contact shading + present. Scene RT capped1920×1080. Depth attachments MUST set `flags=render.TEXTURE_BIT` and must not be transient when sampled later.
-- Shadow pass uses the SAME animated vertex shader as the opaque pass, with separate caster predicates/constants for stone0, kelp1, fish2, mermaid3, ray6. Surface4 and dust7 do not cast. Thus fish/tail/kelp deformation and future GO movement retain matching shadows.
-- Sun direction normalize(.35,.90,-.24), surfaceY26; caustics projection and scattering use the same direction. Scattering integrates camera→opaque hit, clipped at80m, with exponential extinction and animated surface apertures. This is an art-directed single-scattering approximation, not full GI. Indirect fill approximates sky/sand bounce analytically.
-- New looser hair locks, fuller kelp, mineral mottling, brighter coral fill, fewer gold fish, extra floor ruins, and foreground pillar clearance around the ring. Still procedural prototype quality; don't describe as a close reference match.
-- `mermaid.lighting {mode:0}` normal; mode1 depth,2 scattering,3 sun visibility,4 world position. Exposed through native bridge, not normal game UI. Debug views saved under `artifacts/lighting/`; before frame is `before.png`.
-- Frozen native comparison: RGB MAE11.8134%, SSIM0.48573, blurredMAE9.4608%. Previous pre-lighting frame~11.74%/0.490. New lighting is spatially more coherent, but the overall metric has not improved. Do not claim the10% target is reached or adjust comparison to force it.
+## Pitfalls, validation and next work
 
-## Verified checks and pitfalls
-- Latest `python3 tools/playtest.py` passed: identical frozen captures, W3.65m, boost7.17m (1.96×), rise2.70m, drag orbit1.20rad. Actual profiler50 draw calls; native Main Frame mean47.12ms/p9593.13ms during profiling at2560×1440 presentation. This is a regression diagnostic, not a browser FPS claim. Earlier measurements varied widely with GPU load/focus; don't use the earlier3ms CPU scope as real frame rate.
-- `python3 -m unittest tools.test_image_diff -q`: 7 known-value tests pass. Generator / playtest / server compile as Python. Native and Bob HTML5 builds pass.
-- Capture waits for `mermaid.ready` and warmup; initial OS/window resizing can change captures. Warmed frozen frames are pixel-identical.
-- Native .resize/window_width settings did not override this OS scale2 framebuffer. Read actual `g.screen()` dimensions; renderer caps the world target and presents to the physical window.
-- glTF imports fullscreen UVs flipped vertically. Every RT sampling pass restores V. First RT iteration inverted the scene; never fix screenshots after capture. Inspect actual native AND browser after renderer changes.
-- All generated GLB triangles need unit normals, colors[0,1], and no degenerate pole/leaf-tip triangles. Defold validates these strictly. Generator clamps/discards appropriately.
-- Multiple game tabs/native engines distort laptop GPU measurements. Close agent-created extra renderers; do not terminate user browser processes. Native `g.close()` only releases bridge, use `g.close_engine()` to stop our engine.
-- Browser keys: documented Playwright canvas locator `.press('w')` reaches controller; `Tab.pressKey()` was unreliable. Controller preserves80ms tap intent so short synthetic taps survive slow frames.
-- Browser evidence: `/?debug=1&capture=1&width=1280`, click **Save frame and timings**. Actual canvas PNG→`artifacts/scene/browser.png`, state/RAF samples/backend→`browser-metrics.json`. Never substitute a native image. Server accepts same-origin loopback capture POST only. Black canvas readback retries20 frames then reports unavailable.
-- `[hidden]{display:none!important}` is necessary; #loading display:grid otherwise overrode hidden.
-- Browser RAF pacing uses `display.update_frequency=0`; native configured60 cap is a ceiling, not a requirement. Timeline scopes only via `?trace=1`, with overhead. Renderer capture fixtures freeze animation but normal play resumes on input.
-- Controller idle collision skip + camera stationary cache / broad phase retained. Baking experiments increased memory/vertex traffic without a web FPS gain and were discarded. Never reintroduce actor baking to chase performance.
-
-## Research used for this lighting pass
-- NVIDIA GPU Gems3, [Volumetric Light Scattering](https://developer.nvidia.com/gpugems/gpugems3/part-ii-light-and-shadows/chapter-13-volumetric-light-scattering-post-process): scattering must depend on travel through the medium and occlusion; sunlight paths parallel in world space. Our implementation uses depth reconstruction + world-space integration, not its screen-space radial-blur algorithm.
-- [Penrose underwater rendering, GDC2018](https://media.gdcvault.com/gdc2018/presentations/devon_penney_penrose_water.pdf): reference for volumetric underwater look and translucent/FX integration.
-- [Defold render API](https://defold.com/ref/render-lua/) / [render pipeline](https://defold.com/manuals/render/): texture-backed depth attachment flags, sampler bindings, material overrides, RT lifetime.
-
-## Next work (art first)
-1. Inspect newest browser/native frames alongside the reference. Main gap is now sculpted geometry/material quality: weathered broken rock silhouettes, ruins integrated into terraces, less uniform block scale.
-2. Refine mermaid anatomy, posed hands/arms, organic hair clumps/tips, curved fluke silhouette and scales. Current generator is an editable starting point; Blender5.2.2 is available for real sculpt/model work. Keep controller separate from mesh authoring.
-3. Improve surface light/refraction, broad value composition, natural kelp motion, local color accents; adjust rays from actual moving-camera views, not only opening frame. Preserve depth-aware integration.
-4. Profile only to catch meaningful regressions against the30 FPS budget on this device; prioritize visual gains over60 FPS optimization. Browser profiling/capture results below are the current evidence, not historical benchmarks.
-
-## Current browser evidence
-- Bob HTML5 build succeeds without launching Firefox. Actual browser screenshot: `artifacts/scene/browser.png` (1280×720). At capture: 600 RAF samples, mean27.37ms /36.54 FPS, p9566.70ms, trace disabled, ANGLE Intel HD530. Average clears30; spikes remain. Do not claim locked30 or60.
-- Browser W key reached input and changed Z4.00→3.99 immediately, with frozen false/speed.35m/s; full held-key/boost/vertical/orbit tests passed natively.
-- Browser reference diff: MAE11.8050%, SSIM0.48127, coarse9.43657%. These are historical scores; current native difference image is `artifacts/image-diff/diff.png`. The generator no longer emits HTML.
-- Normal playable tab is `http://127.0.0.1:8765/`. Local preview was relaunched detached (`subprocess.Popen(...,start_new_session=True)`) because a long-lived exec session received SIGTERM and broke capture POST. PID in `artifacts/server.pid`, logs `artifacts/server.log`. Before relaunch, inspect stored PID/port; avoid duplicate servers. Stop only the known agent-owned server when required.
-
-## Rollback and user feedback — 2026-10-16
-- User explicitly requested rollback of the rejected visual pass. Commit c424f31 reverts 7e66368; scene, renderer, assets, controller and tools are restored to 913f1fb. Do not reapply its depth prepass or metric-driven palette/layout fitting.
-- Rejected build showed blue missing surfaces in animated hair, tail and vegetation. Frozen-frame checks missed this live rendering regression. Any future render change requires inspecting animated frames and camera movement, not merely a deterministic opening capture.
-- User's central art feedback: reference reads as a BIG OPEN WORLD; our level reads as a narrow CORRIDOR. Tail silhouette differs from reference. Water surface looks wrong. Rollback is a baseline restoration, not a resolution of these art deficits.
-- Metric audit: image_diff.py compares corresponding pixels after LANCZOS resizing to width960 (reference aspect). RGB MAE is mean absolute channel difference divided by255, not percent pixels different and not a fidelity percentage. Similar blue backgrounds can dominate the average and conceal wrong layout/scale/silhouettes. Changed-pixel percentage and SSIM are separate outputs. No automatic alignment/cropping/color matching occurs under default strict mode.
-- The 4% RGB MAE target remains unmet, but must NEVER drive accepting visibly worse art. Judge open-world composition/relative landmark sizes, tail outline, surface appearance, and live surface integrity directly alongside any metrics. Previous rejected build's lower MAE is not evidence of visual improvement.
-- Next art pass must start with reference composition and world proportions, then tail modeling and a convincing distant water surface. Do not attempt to solve these with blanket fog/palette changes or a smaller color-error score.
-- Audit of rejected frozen browser report:9.756% average RGB error, but82.20% of pixels exceeded mean RGB difference10/255 and SSIM was only0.456. These separate values demonstrate why presenting only MAE was misleading. Formula implementation passes7 known-value tests; the failure was using color MAE as the main art objective.
-- Rollback verification: native build launched; frozen and animated captures saved under artifacts/rollback/. Bob wasm-web build/bundle succeeded and existing localhost browser tab was reloaded and visually inspected. Hair/green tail are solid again in these captures. Restored renderer retains historical material warnings/art limitations; do not carry forward the rejected pass's zero-warning or improved-score claims. Only README differs from913f1fb after the revert.
-
-## In-progress art revision — paused at user's request
-- Work after rollback remains UNCOMMITTED and is not an accepted visual match. Native pass4 build/capture succeeded (`artifacts/open-world/pass4.png`). Browser has NOT been rebuilt for this revision; existing browser preview still shows rollback baseline. Do not claim browser validation of these changes.
-- Working geometry now has an open basin with staggered terraces/isolated platforms, seabedY=-4.25, waterY42, square masonry window, curved fuller tail/swept flukes, fingers, larger wavy hair clumps. Shared actors remain separate. Generator now calculates tube normals from surface derivatives, uses tube UVs, and smooth scalp normals.
-- Added smooth sand material, packed caustics/stone/water channels, irregular animated water shading, directional fog background shared with object fog, and corrected receiver-plane shadows. NO opaque depth prepass. Material declaration cleanup retained only for shaders that use the constants.
-- User paused scene work to request tooling. Finish the zero-argument capture/diff command without resuming scene edits. Art revision still needs animated/orbit visual inspection, browser build/profiling, and further composition/model/surface refinement. Current diagnostic pass4: MAE11.8649%, SSIM0.48805, changed pixels87.23%; not a claim of visual fidelity or acceptance.
-- `python3 tools/capture_diff.py` verified end to end with NO arguments: native build/run, frozen capture, engine exit confirmed by bridge before diff, difference image emitted, exit0. Capture state confirms frozen=true and metrics source path points to the newly saved capture.png.
-
-## Single diff image — current user-requested layout, 2026-10-16
-- `python3 tools/capture_diff.py` requires NO arguments: build/run, freeze opening, capture, exit game, emit ONE `artifacts/image-diff/diff.png`. Current layout: reference and screenshot side by side on top, ONE difference panel below. `capture.png` is the original screenshot, not a second diff. No HTML, colored heatmap, pink mask or blended overlay.
-- Full RGB distance BEFORE grayscale display: delta=(referenceRGB-gameRGB)/255; error=sqrt(mean(delta^2)); grayscale=round(255*sqrt(error)). All three channels contribute; more differing channels increases error. Color changes remain visible even at equal grayscale brightness. Black=identical; larger RGB distance=brighter. Fixed square-root display curve; no arbitrary threshold, clipping or per-image normalization.
-- Analysis remains960px wide; each source preview is960×540; lower error panel enlarged2x using nearest neighbor to preserve exact error pixels. Combined output1920×1760. Display metadata version4 records RGB RMS distance and layout; numeric MAE/SSIM protocol remains unchanged (metric_version1).
-- Numeric scores are ONLY diagnostics. User wants a near-black diff achieved through actual interactive3D assets, world layout, materials, textures, lighting/fog and camera. Do not paint/reference-bake the frame or sacrifice appearance to reduce a mean color score. Inspect the generated PNG on EVERY art iteration, including source previews, and inspect animated gameplay for surface integrity/controls.
-- Twelve known-value checks pass, including identical inputs produce black, color-only changes at identical grayscale brightness produce nonzero error, more channel changes increase error, and the lower panel contains exact computed error pixels with no blending. Actual saved engine capture regenerated and resulting PNG visually inspected. Existing zero-argument capture/start/exit sequence remains unchanged.
+- User rejected7e66368(blue cutout hair/tail/plants); revertc424f31 restored913f1fb. Their later97fcc09 checkpoint is not an accepted art match. Do not reintroduce depth prepass/alpha discard or trust only frozen MAE. Inspect animated frames and camera orbit.
+- Render depth attachments sampled later MUST use flags=render.TEXTURE_BIT and not transient. glTF fullscreen UV imports flippedV: each RT lookup restores V; never repair screenshots afterwards.
+- Keep fish/fins/hair/kelp two-sided. Stone/sand can cull backs. Fixed sponge wall winding before culling; fish fins use thin predicate. All GLB normals unit/colors bounded/no degenerate poles. Explicit Python float serialization prevents numpy repr leaking into Lua collision files.
+- Engine max_time_step.1/controller dtcap.1/collision substeps≤25ms avoid slow motion under load. Controls WASD,Space/E,Ctrl/Q,Shift,drag,R,P. Sphere/AABB sliding and cached broad-phase camera obstruction.
+- Prior hand-outlined extruded cliff experiment21–22 looked like stacked shelves; rejected and removed. Do not restore it. Fuller terrain is current, still wrong relative to art. Earlier long notes preserved locally at artifacts/progress/agent-notes-through-pass32.md; per-pass captures/metrics remain under artifacts/progress/.
+- Known moving-view bugs: unsupported purple sponge at(-10.7,13,-20), possibly coral(-9,9,-20)/kelp(-11,11,-5); hard seabed rectangle edge visible during orbit. Fix each as a separate geometry pass.
+- Next: record evidence and commit reviewable checkpoint. Then ONE visual element at a time: mermaid screen placement, remaining column visibility, rock silhouette/position, vegetation shape/placement, caustic pattern, surface texture. Recheck coupled lighting quantities without changing several elements at once. Never call the90%/all-black goal achieved while geometry is missing or the normal scene still looks wrong.

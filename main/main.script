@@ -15,6 +15,8 @@ local function reset(self,freeze)
     self.keys={}
     self.taps={}
     self.speed=0
+    self.bank=0
+    self.tilt=-.45
     self.dragging=false
     self.camera_cache=nil
 end
@@ -92,7 +94,7 @@ end
 
 function update(self,dt)
     local raw_dt=dt
-    dt=math.min(dt,.05)
+    dt=math.min(dt,.1)
     self.frames=self.frames+1
     self.frame_ms=self.frame_ms+(raw_dt*1000-self.frame_ms)*.06
     local k=self.keys
@@ -110,7 +112,8 @@ function update(self,dt)
     local input=vmath.length_sqr(desired)>0
     self.velocity=vmath.lerp(smooth(input and 4.5 or 3.4,dt),self.velocity,desired*target_speed)
     if vmath.length_sqr(self.velocity)>.0001 then
-        self.position=resolve(self.position+self.velocity*dt)
+        local steps=math.max(1,math.ceil(dt/.025))
+        for _=1,steps do self.position=resolve(self.position+self.velocity*(dt/steps)) end
     else self.velocity=vmath.vector3() end
     self.speed=vmath.length(self.velocity)
     if input and (forward~=0 or side~=0) then
@@ -118,13 +121,14 @@ function update(self,dt)
         self.heading=self.heading+wrap(target_heading-self.heading)*smooth(6,dt)
     end
     if not self.frozen then self.time=self.time+dt end
-    local bank=side*-.16
-    local tilt=-.45+forward*.08-vertical*.14
+    self.bank=self.bank+(side*-.16-self.bank)*smooth(4,dt)
+    self.tilt=self.tilt+(-.45+forward*.08-vertical*.14-self.tilt)*smooth(4,dt)
+    local bank,tilt=self.bank,self.tilt
     go.set_position(self.position+vmath.vector3(0,math.sin(self.time*1.4)*.035,0),"/player")
     go.set_rotation(vmath.quat_rotation_y(self.heading)*vmath.quat_rotation_z(bank-.12)*vmath.quat_rotation_x(tilt),"/player")
     go.set_scale(.85,"/player")
     local offset=vmath.vector3(math.sin(self.yaw)*9*math.cos(self.pitch),1.36-math.sin(self.pitch)*9,math.cos(self.yaw)*9*math.cos(self.pitch))
-    local desired_camera=self.position+offset+vmath.vector3(1,0,0)
+    local desired_camera=self.position+offset+vmath.vector3(.6,0,0)
     desired_camera.y=math.max(.8,desired_camera.y)
     -- Broad phase plus an exact expanded-AABB segment test. Cache stationary arms.
     local anchor=self.position+vmath.vector3(0,1,0)

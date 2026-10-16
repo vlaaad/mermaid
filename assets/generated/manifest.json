@@ -1,84 +1,142 @@
 {
   "rock0": {
-    "triangles": 64,
-    "bytes": 10344
+    "triangles": 40,
+    "vertices": 93,
+    "unindexed_vertices": 120,
+    "bytes": 6204
   },
   "rock1": {
-    "triangles": 64,
-    "bytes": 10344
+    "triangles": 52,
+    "vertices": 120,
+    "unindexed_vertices": 156,
+    "bytes": 7652
   },
   "rock2": {
-    "triangles": 64,
-    "bytes": 10344
+    "triangles": 48,
+    "vertices": 111,
+    "unindexed_vertices": 144,
+    "bytes": 7172
   },
   "rock3": {
-    "triangles": 64,
-    "bytes": 10344
+    "triangles": 52,
+    "vertices": 120,
+    "unindexed_vertices": 156,
+    "bytes": 7652
   },
   "column": {
-    "triangles": 1408,
-    "bytes": 203820
+    "triangles": 5912,
+    "bytes": 329580,
+    "source": "assets/source/ruins.blend"
   },
   "arch": {
-    "triangles": 796,
-    "bytes": 115764
+    "triangles": 4626,
+    "bytes": 211220,
+    "source": "assets/source/ruins.blend"
   },
   "ring": {
-    "triangles": 336,
-    "bytes": 49516
+    "triangles": 4290,
+    "bytes": 179480,
+    "source": "assets/source/ruins.blend"
   },
   "kelp": {
     "triangles": 672,
-    "bytes": 97908
+    "vertices": 900,
+    "unindexed_vertices": 2016,
+    "bytes": 52544
+  },
+  "ribbon_kelp": {
+    "triangles": 600,
+    "vertices": 1800,
+    "unindexed_vertices": 1800,
+    "bytes": 94896
   },
   "sponge": {
-    "triangles": 540,
-    "bytes": 78884
+    "triangles": 1568,
+    "vertices": 4704,
+    "unindexed_vertices": 4704,
+    "bytes": 245884
   },
   "coral_pink": {
-    "triangles": 1026,
-    "bytes": 148900
+    "triangles": 3528,
+    "vertices": 4284,
+    "unindexed_vertices": 10584,
+    "bytes": 249268
   },
   "coral_blue": {
-    "triangles": 1026,
-    "bytes": 148900
+    "triangles": 3528,
+    "vertices": 4284,
+    "unindexed_vertices": 10584,
+    "bytes": 249268
+  },
+  "coral_gold": {
+    "triangles": 3528,
+    "vertices": 4284,
+    "unindexed_vertices": 10584,
+    "bytes": 249268
   },
   "fish": {
-    "triangles": 90,
-    "bytes": 14092
+    "triangles": 162,
+    "vertices": 120,
+    "unindexed_vertices": 486,
+    "bytes": 8976
   },
   "fish_blue": {
-    "triangles": 90,
-    "bytes": 14104
+    "triangles": 162,
+    "vertices": 120,
+    "unindexed_vertices": 486,
+    "bytes": 8988
+  },
+  "fish_orange": {
+    "triangles": 162,
+    "vertices": 120,
+    "unindexed_vertices": 486,
+    "bytes": 8992
+  },
+  "fish_silver": {
+    "triangles": 162,
+    "vertices": 120,
+    "unindexed_vertices": 486,
+    "bytes": 8992
   },
   "ray": {
-    "triangles": 186,
-    "bytes": 27912
+    "triangles": 1304,
+    "vertices": 2384,
+    "unindexed_vertices": 3912,
+    "bytes": 131364
   },
   "mermaid": {
-    "triangles": 18592,
-    "bytes": 2678404
+    "triangles": 42200,
+    "bytes": 2329620,
+    "source": "assets/source/mermaid.blend"
   },
   "seabed": {
     "triangles": 2294,
-    "bytes": 331428
+    "vertices": 6882,
+    "unindexed_vertices": 6882,
+    "bytes": 359100
   },
   "surface": {
     "triangles": 2,
-    "bytes": 1316
+    "vertices": 4,
+    "unindexed_vertices": 6,
+    "bytes": 1384
   },
   "particle": {
     "triangles": 16,
-    "bytes": 3440
+    "vertices": 30,
+    "unindexed_vertices": 48,
+    "bytes": 2908
   },
   "fullscreen": {
     "triangles": 2,
-    "bytes": 1316
+    "vertices": 4,
+    "unindexed_vertices": 6,
+    "bytes": 1380
   },
   "world": {
-    "instances": 1510,
-    "source_placements": 1510,
-    "collision_boxes": 1193,
+    "instances": 1722,
+    "source_placements": 1722,
+    "collision_boxes": 1213,
     "seed": 73
   }
 }
