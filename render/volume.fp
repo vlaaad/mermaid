@@ -3,7 +3,7 @@ in mediump vec2 var_uv;
 out vec4 out_fragColor;
 uniform highp sampler2D scene_depth;
 uniform highp sampler2D sun_depth;
-uniform mediump sampler2D surface_flux;
+uniform mediump sampler2D solar_flux;
 uniform fs_uniforms {
     highp mat4 inverse_view_projection;
     highp mat4 light_matrix;
@@ -50,6 +50,14 @@ void main() {
     float plane=floor(origin/spacing)*spacing;
     if(rate>0.0)plane+=spacing;
     float first=(plane-origin)/rate,stepLength=spacing/abs(rate);
+    // Prefilter each interval's footprint on the aperture, so a camera move
+    // cannot jump across a narrow beam between adjacent integration samples.
+    float apertureFootprint=length(dir.xz-dir.y*sun.xz/sun.y)*stepLength*4.0;
+    float intervalLod=log2(max(apertureFootprint,1.0));
+    // One footprint per view ray; avoid a logarithm for every water sample.
+    float spread=max(intervalLod,log2(1.0+max(50.0-camera_pos.y,0.0)*.035));
+    vec2 apertureOrigin=(camera_pos.xz+(50.0-camera_pos.y)*sun.xz/sun.y)/64.0;
+    vec2 apertureRate=(dir.xz-dir.y*sun.xz/sun.y)/64.0;
     // Beer-Lambert extinction along the view and the incoming sunlight path.
     // Integrate transmittance exactly within each interval (Hillaire 2015).
     const float extinction=.0165;
@@ -60,21 +68,20 @@ void main() {
         if(hi>lo) {
             float nextTransmission=exp(-combined*hi);
             vec3 p=camera_pos.xyz+dir*((lo+hi)*.5);
-            // Refractive flux uses the same ray-baked caustic field and light
-            // projection as the seabed. Prefilter sub-interval detail to prevent
-            // aliasing; the field is invariant along the sun, not the camera.
-            vec2 lightUV=(p.xz-p.y*sun.xz/sun.y)*.035;
-            float flux=.20+textureLod(surface_flux,lightUV,3.0).r*6.65;
+            // Project onto the water plane along the sun direction. Irradiance
+            // stays fixed along each light path, never in camera/screen space.
+            vec2 aperture=apertureOrigin+apertureRate*((lo+hi)*.5);
+            float flux=.10+textureLod(solar_flux,aperture,spread).r*11.0;
             scatter+=sunVisible(p)*flux*(transmission-nextTransmission);
             transmission=nextTransmission;
             lo=hi;
         }
         if(lo>=end)break;
     }
-    float mu=dot(dir,sun),g=.65;
+    float mu=dot(dir,sun),g=.50;
     float phase=(1.0-g*g)/pow(1.0+g*g-2.0*g*mu,1.5);
     float solarTransmission=exp(-max(50.0-camera_pos.y,0.0)*.008/sun.y);
-    vec3 color=vec3(.90,.98,1.0)*scatter*(extinction/combined)*solarTransmission*phase*.11;
+    vec3 color=vec3(.90,.98,1.0)*scatter*(extinction/combined)*solarTransmission*phase*.14;
     if(visual_debug.x>.5 && visual_debug.x<1.5)color=vec3(z/70.0);
     if(visual_debug.x>1.5 && visual_debug.x<2.5)color=vec3(scatter*.5);
     if(visual_debug.x>2.5 && visual_debug.x<3.5)color=vec3(sunVisible(hit));

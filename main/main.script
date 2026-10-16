@@ -1,4 +1,4 @@
-go.property("surface_flux", resource.texture("/assets/generated/caustics.png"))
+go.property("solar_flux",resource.texture("/assets/generated/sunlight_aperture.png"))
 local obstacles = require "main.obstacles"
 local collision = require "main.collision"
 local function clamp(v,a,b) return math.max(a,math.min(b,v)) end
@@ -56,7 +56,7 @@ local function state(self)
 end
 
 function init(self)
-    msg.post("@render:","surface_flux",{texture=resource.get_texture_info(self.surface_flux).handle})
+    msg.post("@render:","solar_flux",{texture=resource.get_texture_info(self.solar_flux).handle})
     msg.post(".","acquire_input_focus")
     reset(self,false)
     self.frames=0

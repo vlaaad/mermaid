@@ -29,7 +29,7 @@ for name in names:
         amount = noise.noise(p*3.7, noise_basis='PERLIN_ORIGINAL')*(.012 if name.startswith('rock') else .024)
         vertex.co += vertex.normal*amount
     bevel = obj.modifiers.new('Worn masonry edges', 'BEVEL')
-    bevel.width=.035 if name.startswith('rock') else .045;bevel.segments=2;bevel.limit_method='ANGLE';bevel.angle_limit=.65
+    bevel.width=.035 if name.startswith('rock') else .045;bevel.segments=2;bevel.limit_method='ANGLE';bevel.angle_limit=1.1 if name=='column' else .65
     bpy.ops.object.modifier_apply(modifier=bevel.name)
     for face in obj.data.polygons:face.use_smooth=True
     weighted = obj.modifiers.new('Broad stone face normals', 'WEIGHTED_NORMAL')

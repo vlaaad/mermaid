@@ -53,6 +53,7 @@ function update(self)
     local center=desired+right*(math.floor(x/texel+.5)*texel-x)+up*(math.floor(y/texel+.5)*texel-y)
     local light_view=vmath.matrix4_look_at(center+sun*80,center,vmath.vector3(0,0,1))
     local light_proj=vmath.matrix4_orthographic(-50,50,-50,50,1,150)
+    local far_caster_frustum=vmath.matrix4_orthographic(-52,52,-52,52,1,150)*light_view
     self.constants.light_matrix=light_proj*light_view
     render.set_depth_mask(true)
     render.enable_state(graphics.STATE_DEPTH_TEST)
@@ -64,14 +65,12 @@ function update(self)
     render.set_view(light_view)
     render.set_projection(light_proj)
     render.enable_material("shadow")
-    self.shadow_constants.time_data=self.constants.time_data
     for _,category in ipairs({0,1,2,3,6}) do
-        self.shadow_constants.params=vmath.vector4(category,0,0,0)
         if category==0 then
             render.enable_state(graphics.STATE_CULL_FACE)
-            render.set_cull_face(graphics.FACE_TYPE_FRONT)
+            render.set_cull_face(graphics.FACE_TYPE_BACK)
         else render.disable_state(graphics.STATE_CULL_FACE) end
-        render.draw(self.casters[category],{constants=self.shadow_constants,frustum=self.constants.light_matrix})
+        render.draw(self.casters[category],{constants=self.shadow_constants,frustum=far_caster_frustum})
     end
     render.disable_material()
     render.disable_state(graphics.STATE_CULL_FACE)
@@ -86,19 +85,19 @@ function update(self)
     local near_view=vmath.matrix4_look_at(near_center+sun*60,near_center,vmath.vector3(0,0,1))
     local near_proj=vmath.matrix4_orthographic(-12,12,-12,12,1,120)
     self.constants.near_light_matrix=near_proj*near_view
+    local near_caster_frustum=vmath.matrix4_orthographic(-14,14,-14,14,1,120)*near_view
     render.set_render_target(self.near_shadow)
     render.set_viewport(0,0,512,512)
-    render.clear({[graphics.BUFFER_TYPE_COLOR0_BIT]=vmath.vector4(math.exp(20),math.exp(40),-math.exp(-20),math.exp(-40)),[graphics.BUFFER_TYPE_DEPTH_BIT]=1})
+    render.clear({[graphics.BUFFER_TYPE_COLOR0_BIT]=vmath.vector4(1,1,0,0),[graphics.BUFFER_TYPE_DEPTH_BIT]=1})
     render.set_view(near_view)
     render.set_projection(near_proj)
     render.enable_material("shadow_moments")
     for _,category in ipairs({0,1,2,3,6,8}) do
-        self.shadow_constants.params=vmath.vector4(category,0,0,0)
         if category==0 or category==8 then
             render.enable_state(graphics.STATE_CULL_FACE)
             render.set_cull_face(graphics.FACE_TYPE_BACK)
         else render.disable_state(graphics.STATE_CULL_FACE) end
-        render.draw(self.casters[category],{constants=self.shadow_constants,frustum=self.constants.near_light_matrix})
+        render.draw(self.casters[category],{constants=self.shadow_constants,frustum=near_caster_frustum})
     end
     render.disable_material()
     render.disable_state(graphics.STATE_CULL_FACE)
@@ -134,18 +133,27 @@ function update(self)
     render.enable_state(graphics.STATE_DEPTH_TEST)
     render.enable_texture("sun_depth",self.shadow,graphics.BUFFER_TYPE_DEPTH_BIT)
     render.enable_texture("near_shadow",self.near_shadow,graphics.BUFFER_TYPE_COLOR0_BIT)
-    render.enable_state(graphics.STATE_CULL_FACE)
-    render.set_cull_face(graphics.FACE_TYPE_BACK)
-    render.draw(self.solid,{constants=self.constants,frustum=projection*self.view})
-    render.disable_state(graphics.STATE_CULL_FACE)
-    render.draw(self.thin,{constants=self.constants,frustum=projection*self.view})
+    if self.constants.visual_debug.x>9.5 and self.constants.visual_debug.x<11.5 then
+        -- Compare visible and shadow vertex paths for plants, fish and rays.
+        if self.constants.visual_debug.x>10.5 then render.enable_material("shadow") end
+        for _,category in ipairs({1,2,6}) do
+            render.draw(self.casters[category],{constants=self.constants,frustum=projection*self.view})
+        end
+        if self.constants.visual_debug.x>10.5 then render.disable_material() end
+    else
+        render.enable_state(graphics.STATE_CULL_FACE)
+        render.set_cull_face(graphics.FACE_TYPE_BACK)
+        render.draw(self.solid,{constants=self.constants,frustum=projection*self.view})
+        render.disable_state(graphics.STATE_CULL_FACE)
+        render.draw(self.thin,{constants=self.constants,frustum=projection*self.view})
+    end
     render.disable_texture("near_shadow")
     render.set_depth_mask(false)
     render.enable_state(graphics.STATE_BLEND)
     render.set_blend_func(graphics.BLEND_FACTOR_ONE,graphics.BLEND_FACTOR_ONE_MINUS_SRC_ALPHA)
     render.enable_state(graphics.STATE_CULL_FACE)
     render.set_cull_face(graphics.FACE_TYPE_BACK)
-    render.draw(self.bubbles,{constants=self.constants,frustum=projection*self.view})
+    if self.constants.visual_debug.x<9.5 then render.draw(self.bubbles,{constants=self.constants,frustum=projection*self.view}) end
     render.disable_state(graphics.STATE_CULL_FACE)
     render.disable_state(graphics.STATE_BLEND)
     render.disable_state(graphics.STATE_DEPTH_TEST)
@@ -154,11 +162,11 @@ function update(self)
     render.set_render_target(self.water)
     render.set_viewport(0,0,math.ceil(rw/4),math.ceil(rh/4))
     render.enable_texture("scene_depth",self.target,graphics.BUFFER_TYPE_DEPTH_BIT)
-    if self.surface_flux then render.enable_texture("surface_flux",self.surface_flux) end
+    if self.solar_flux then render.enable_texture("solar_flux",self.solar_flux) end
     render.enable_material("volume")
     render.draw(self.blit,{constants=self.constants})
     render.disable_material()
-    if self.surface_flux then render.disable_texture("surface_flux") end
+    if self.solar_flux then render.disable_texture("solar_flux") end
     render.set_render_target(self.composite)
     render.set_viewport(0,0,rw,rh)
     render.enable_texture("scene_texture",self.target,graphics.BUFFER_TYPE_COLOR0_BIT)
@@ -184,7 +192,7 @@ function update(self)
 end
 
 function on_message(self,id,message)
-    if id==hash("surface_flux") then self.surface_flux=message.texture end
+    if id==hash("solar_flux") then self.solar_flux=message.texture end
     if id==hash("lighting_debug") then self.constants.visual_debug=vmath.vector4(message.mode,0,0,0) end
     if id==hash("scene_camera") then
         self.view=message.view

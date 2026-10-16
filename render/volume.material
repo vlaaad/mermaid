@@ -12,4 +12,4 @@ fragment_constants { name: "camera_pos" type: CONSTANT_TYPE_USER }
 
 fragment_constants { name: "visual_debug" type: CONSTANT_TYPE_USER }
 
-samplers { name: "surface_flux" wrap_u: WRAP_MODE_REPEAT wrap_v: WRAP_MODE_REPEAT filter_min: FILTER_MODE_MIN_LINEAR_MIPMAP_LINEAR filter_mag: FILTER_MODE_MAG_LINEAR }
+samplers { name: "solar_flux" wrap_u: WRAP_MODE_REPEAT wrap_v: WRAP_MODE_REPEAT filter_min: FILTER_MODE_MIN_LINEAR_MIPMAP_LINEAR filter_mag: FILTER_MODE_MAG_LINEAR }

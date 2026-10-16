@@ -29,8 +29,8 @@
     "source": "assets/source/rocks.blend"
   },
   "column": {
-    "triangles": 4178,
-    "bytes": 286936,
+    "triangles": 3060,
+    "bytes": 241628,
     "source": "assets/source/ruins.blend"
   },
   "arch": {

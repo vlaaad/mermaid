@@ -40,8 +40,8 @@ highp float bound(highp vec2 moments,highp float receiver) {
 }
 highp float nearVisibility(highp vec3 q) {
     highp vec4 m=texture(near_shadow,q.xy);
-    highp float w=40.0*(q.z-.00012-.5);
-    highp float v=min(bound(m.xy,exp(w)),bound(m.zw,-exp(-w)));
+    highp float z=q.z-.00012;
+    highp float v=min(bound(m.xy,exp(32.0*(z-1.0))),bound(m.zw,-exp(-32.0*z)));
     return clamp((v-.15)/.85,0.0,1.0);
 }
 float visibility(vec3 p,vec3 normal,float ndl) {
@@ -50,6 +50,9 @@ float visibility(vec3 p,vec3 normal,float ndl) {
     float nearWeight=smoothstep(.015,.075,edge);
     if(nearQ.z<0.0 || nearQ.z>1.0)nearWeight=0.0;
     float closeShadow=nearWeight>0.0?nearVisibility(nearQ):1.0;
+    if(visual_debug.x>6.5 && visual_debug.x<7.5)nearWeight=0.0;
+    if(visual_debug.x>7.5 && visual_debug.x<8.5)return closeShadow;
+    if(visual_debug.x>8.5 && visual_debug.x<9.5)return nearWeight;
     if(nearWeight>=1.0)return closeShadow;
     if(abs(light_matrix[3].w)<.0001)return 1.0;
     vec4 light=light_matrix*vec4(p+normal*.025,1.0);
@@ -77,6 +80,8 @@ vec3 fogged(vec3 shaded,float density,bool surface) {
     return mix(shaded,fog,blend);
 }
 void main() {
+    if(visual_debug.x>11.5) {out_fragColor=vec4(vec3(params.x>7.5?1.0:0.0),1.0);return;}
+    if(visual_debug.x>9.5) {out_fragColor=vec4(vec3((params.x>.5 && params.x<2.5)||(params.x>5.5 && params.x<6.5)?1.0:0.0),1.0);return;}
     if(visual_debug.x>4.5 && visual_debug.x<5.5) {
         float architecture=(params.x<.5 && var_color.a<.4)?1.0:0.0;
         out_fragColor=vec4(vec3(architecture),1.0);
@@ -88,6 +93,7 @@ void main() {
     if(!gl_FrontFacing && params.x>2.5 && params.x<3.5 && var_color.a>.37 && var_color.a<.62)n=-n;
     vec3 sun=normalize(vec3(.35,.90,-.24));
     float diffuse=max(dot(n,sun),0.0);
+    if(params.x>.5 && params.x<1.5 && dot(geometric,sun)<0.0)geometric=-geometric;
     // Bias a thin fin toward the light on either side to avoid self-shadow acne.
     if(params.x>2.5 && params.x<3.5 && var_color.a>.37 && var_color.a<.62 && dot(geometric,sun)<0.0)geometric=-geometric;
     float shadow=visibility(var_world,geometric,diffuse);

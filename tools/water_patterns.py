@@ -37,3 +37,22 @@ def caustics(size=512):
     image=Image.fromarray(np.uint8(np.clip(padded/6,0,1)*255)).filter(ImageFilter.GaussianBlur(.85))
     density=np.asarray(image,dtype=float)[8:-8,8:-8]*6/255
     return np.clip((density-.72)*.40,0,1)
+
+
+def sunlight_aperture(size=256):
+    """Broad isolated irradiance peaks; seamless, fixed in world space.
+
+    A band-limited surface convergence proxy, rather than the thin connected
+    floor-caustic network. Runtime mip filtering broadens it with water depth.
+    This is an artistic approximation to surface focusing, not a ray solution.
+    """
+    rng=np.random.default_rng(275)
+    field=rng.normal(size=(size,size))
+    fy=np.fft.fftfreq(size)[:,None];fx=np.fft.fftfreq(size)[None,:]
+    frequency=np.sqrt(fx*fx+fy*fy)
+    band=np.exp(-(frequency/.036)**2)*(1-np.exp(-(frequency/.012)**2))
+    field=np.fft.ifft2(np.fft.fft2(field)*band).real
+    field/=field.std()
+    peaks=np.clip((field-.25)/2.1,0,1)
+    peaks=peaks*peaks*(3-2*peaks)
+    return np.uint8(peaks*255)

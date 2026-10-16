@@ -14,7 +14,7 @@ import struct
 
 import numpy as np
 from PIL import Image
-from water_patterns import caustics as bake_caustics, surface_normals
+from water_patterns import caustics as bake_caustics, surface_normals, sunlight_aperture
 from world_geometry import triangles as read_triangles, rotation as rotation_matrix, convex_collider, Support
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -225,15 +225,23 @@ def column():
     stone=(.32,.38,.37)
     m.box((0,.22,0),(2.0,.44,2.0),stone,.13)
     m.box((0,.57,0),(1.68,.25,1.68),stone,.1)
-    for drum in range(6):
-        lo=.73+drum*1.15
-        rings=[]
-        for y,r in [(lo,.68),(lo+.08,.72),(lo+1.08,.70),(lo+1.13,.67)]:
-            rings.append([(math.cos(j*math.tau/64)*r*(1+.10*math.cos(j*math.tau*8/64)),y,math.sin(j*math.tau/64)*r*(1+.10*math.cos(j*math.tau*8/64))) for j in range(64)])
-        for i in range(3):
-            for j in range(64):
-                jj=(j+1)%64
-                m.quad(rings[i][j],rings[i+1][j],rings[i+1][jj],rings[i][jj],stone)
+    # A continuous fluted shell, with recessed joints between drums. Separate
+    # open tubes exposed the water as broken pixel-wide stripes at distance.
+    sides=48  # Six samples per flute; spend the old vertex budget on closed joints.
+    rings=[]
+    for y,r in [(.67,.68)]+[(y,r) for drum in range(6) for y,r in
+            [(.73+drum*1.15,.68),(.81+drum*1.15,.72),
+             (1.81+drum*1.15,.70),(1.86+drum*1.15,.67)]]:
+        rings.append([(math.cos(j*math.tau/sides)*r*(1+.10*math.cos(j*math.tau*8/sides)),y,
+                       math.sin(j*math.tau/sides)*r*(1+.10*math.cos(j*math.tau*8/sides))) for j in range(sides)])
+    for i in range(len(rings)-1):
+        for j in range(sides):
+            jj=(j+1)%sides
+            m.quad(rings[i][j],rings[i+1][j],rings[i+1][jj],rings[i][jj],stone)
+    for j in range(sides):
+        jj=(j+1)%sides
+        m.tri((0,rings[0][0][1],0),rings[0][j],rings[0][jj],stone)
+        m.tri((0,rings[-1][0][1],0),rings[-1][jj],rings[-1][j],stone)
     m.box((0,7.78,0),(1.65,.4,1.65),stone,.08)
     m.box((0,8.11,0),(2.0,.3,2.0),stone,.1)
     return m
@@ -663,6 +671,7 @@ def main():
         return np.asarray(Image.fromarray(np.uint8(field*255)).resize((512,512),Image.Resampling.BICUBIC))/255
     Image.fromarray(np.uint8(np.clip(np.stack([intensity,enlarged(stone),enlarged(water)],axis=-1),0,1)*255)).save(OUT/'caustics.png')
     Image.fromarray(surface_normals()).save(OUT/'surface_water.png')
+    Image.fromarray(sunlight_aperture()).save(OUT/'sunlight_aperture.png')
 
     # Queries use the final exported stone, including its authored bevels.
     finish_character()

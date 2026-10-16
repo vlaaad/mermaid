@@ -13,36 +13,11 @@ out mediump vec3 var_local;
 uniform vs_uniforms {
     highp mat4 mtx_view;
     highp mat4 mtx_proj;
-    mediump vec4 time_data;
-    mediump vec4 params;
 };
 void main() {
     vec3 p = position.xyz;
-    float t = time_data.x;
-    vec3 origin = mtx_world[3].xyz;
-    if (params.x > 0.5 && params.x < 1.5) {
-        float h = max(p.y, 0.0);
-        p.x += sin(t * 0.80 + origin.x * 0.3 + origin.z * 0.2 + h * 0.8) * h * h * 0.024;
-        p.z += cos(t * 0.60 + h + origin.z) * h * 0.032;
-    } else if (params.x > 1.5 && params.x < 2.5) {
-        p.z += sin(t * 5.0 + origin.x+origin.z*.5 + texcoord0.x*10.0) * texcoord0.x * 0.22;
-
-    } else if (params.x > 5.5 && params.x < 6.5) {
-        p.y += sin(t*1.4-abs(p.x)*2.0)*abs(p.x)*.15;
-
-    } else if (params.x > 6.5 && params.x < 7.5) {
-        p.y += sin(t*.35+p.x+p.z)*.20;
-        p.x += sin(t*.25+p.z*.3)*.15;
-    }
+    // Actor placement and deformation belong to the simulation/rig systems.
     vec4 world = mtx_world * vec4(p,1.0);
-    // Actor travel is in world units, independent of asset scale or heading.
-    if(params.x>1.5 && params.x<2.5) {
-        world.x+=sin(t*.18+origin.z*.12)*1.1;
-        world.y+=sin(t*.8+origin.z)*.12;
-    } else if(params.x>5.5 && params.x<6.5) {
-        world.x+=sin(t*.17+origin.z)*2.0;
-        world.z+=cos(t*.23+origin.x)*.45;
-    }
     vec3 scale2 = vec3(dot(mtx_world[0].xyz,mtx_world[0].xyz),dot(mtx_world[1].xyz,mtx_world[1].xyz),dot(mtx_world[2].xyz,mtx_world[2].xyz));
     var_normal = normalize(mat3(mtx_world) * (normal / max(scale2, vec3(0.0001))));
     var_world = world.xyz;
