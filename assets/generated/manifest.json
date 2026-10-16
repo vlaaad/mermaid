@@ -1,19 +1,19 @@
 {
   "rock0": {
-    "triangles": 120,
-    "bytes": 18412
+    "triangles": 64,
+    "bytes": 10344
   },
   "rock1": {
-    "triangles": 120,
-    "bytes": 18408
+    "triangles": 64,
+    "bytes": 10344
   },
   "rock2": {
-    "triangles": 120,
-    "bytes": 18412
+    "triangles": 64,
+    "bytes": 10344
   },
   "rock3": {
-    "triangles": 120,
-    "bytes": 18412
+    "triangles": 64,
+    "bytes": 10344
   },
   "column": {
     "triangles": 1408,
@@ -28,12 +28,8 @@
     "bytes": 39112
   },
   "kelp": {
-    "triangles": 296,
-    "bytes": 43760
-  },
-  "ribbon_kelp": {
-    "triangles": 104,
-    "bytes": 16100
+    "triangles": 444,
+    "bytes": 65076
   },
   "sponge": {
     "triangles": 540,
@@ -60,8 +56,8 @@
     "bytes": 27912
   },
   "mermaid": {
-    "triangles": 13696,
-    "bytes": 1973368
+    "triangles": 13324,
+    "bytes": 1919800
   },
   "seabed": {
     "triangles": 2294,
@@ -80,9 +76,9 @@
     "bytes": 1316
   },
   "world": {
-    "instances": 1060,
-    "source_placements": 1060,
-    "collision_boxes": 676,
+    "instances": 571,
+    "source_placements": 571,
+    "collision_boxes": 197,
     "seed": 73
   }
 }

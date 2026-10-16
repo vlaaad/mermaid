@@ -23,7 +23,7 @@ def main():
     capabilities=['application.commands','application.state','input.key>=2','input.drag','screenshot']
     g=p.connect_engine(required_capabilities=capabilities) if args.attach else p.build_and_run(focus=True,timeout=180,required_capabilities=capabilities)
     g.wait_for_state('mermaid.ready',True,timeout=45)
-    g.wait_frames(60,timeout=15)
+    g.wait_frames(60)
     results={'screen':g.screen()}
     def ready():
         g.wait_frames(15)

@@ -10,7 +10,6 @@ uniform fs_uniforms {
     mediump vec4 time_data;
     mediump vec4 screen_size;
     mediump vec4 visual_debug;
-    mediump vec4 art_water;
 };
 vec3 worldAt(vec2 uv,float depth) {
     vec4 p=inverse_view_projection*vec4(uv*2.0-1.0,depth*2.0-1.0,1.0);
@@ -21,7 +20,7 @@ float sunVisible(vec3 p) {
     vec4 l=light_matrix*vec4(p,1.0);
     vec3 q=l.xyz/l.w*.5+.5;
     if(q.x<0.0 || q.y<0.0 || q.x>1.0 || q.y>1.0)return 1.0;
-    return step(q.z-.0003,texture(sun_depth,q.xy).r);
+    return step(q.z-.0014,texture(sun_depth,q.xy).r);
 }
 void main() {
     // glTF imports V flipped. All render-target lookups use the restored UV.
@@ -42,21 +41,21 @@ void main() {
     for(int i=0;i<32;i++) {
         float d=(float(i)+jitter)*stride;
         vec3 p=camera_pos.xyz+dir*d;
-        vec2 surface=p.xz+(48.0-p.y)*vec2(.389,-.267);
+        vec2 surface=p.xz+(26.0-p.y)*vec2(.389,-.267);
         vec2 wave=vec2(sin(surface.y*.35+time_data.x*.11),cos(surface.x*.29-time_data.x*.09))*.6;
         vec2 s=surface+wave;
-        vec2 a=(s-vec2(18.56,-34.87))/vec2(4.5,8.0);
-        vec2 b=(s-vec2(30.56,-48.87))/vec2(4.0,8.0);
-        vec2 c=(s-vec2(7.56,-24.87))/vec2(3.0,6.0);
-        vec2 e=(s-vec2(21.56,-15.87))/vec2(3.6,5.5);
+        vec2 a=(s-vec2(10.0,-29.0))/vec2(4.5,8.0);
+        vec2 b=(s-vec2(22.0,-43.0))/vec2(4.0,8.0);
+        vec2 c=(s-vec2(-1.0,-19.0))/vec2(3.0,6.0);
+        vec2 e=(s-vec2(13.0,-10.0))/vec2(3.6,5.5);
         float aperture=exp(-dot(a,a))+exp(-dot(b,b))*.8+exp(-dot(c,c))*.7+exp(-dot(e,e))*.6;
         float filaments=.95+.05*sin(s.x*3.2+s.y*.75+time_data.x*.13);
         aperture*=filaments;
-        float water=smoothstep(-1.0,2.0,p.y)*(1.0-smoothstep(47.0,49.0,p.y));
+        float water=smoothstep(-1.0,2.0,p.y)*(1.0-smoothstep(25.0,27.0,p.y));
         scatter+=(.025+aperture)*sunVisible(p)*water*exp(-d*.027)*stride;
     }
     float forward=.75+pow(max(dot(dir,normalize(vec3(.35,.90,-.24))),0.0),3.0)*1.7;
-    color+=art_water.rgb*scatter*art_water.w*forward;
+    color+=vec3(.48,.68,.76)*scatter*.09*forward;
     if(visual_debug.x>.5 && visual_debug.x<1.5)color=vec3(z/70.0);
     if(visual_debug.x>1.5 && visual_debug.x<2.5)color=vec3(scatter*.12);
     if(visual_debug.x>2.5 && visual_debug.x<3.5)color=vec3(sunVisible(hit));

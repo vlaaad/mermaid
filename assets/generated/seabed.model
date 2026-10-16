@@ -1,7 +1,6 @@
 mesh: "/assets/generated/seabed.glb"
 materials {
  name: "reef"
- material: "/render/sand.material"
+ material: "/render/stone.material"
  textures { sampler: "caustics" texture: "/assets/generated/caustics.png" }
- textures { sampler: "stone_detail" texture: "/assets/textures/limestone-v1.png" }
 }

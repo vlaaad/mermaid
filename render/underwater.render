@@ -1,4 +1,3 @@
 script: "/render/underwater.render_script"
 render_resources { name: "shadow" path: "/render/shadow.material" }
 render_resources { name: "volume" path: "/render/volume.material" }
-render_resources { name: "depth" path: "/render/depth.material" }
