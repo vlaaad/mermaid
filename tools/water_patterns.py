@@ -50,9 +50,9 @@ def sunlight_aperture(size=256):
     field=rng.normal(size=(size,size))
     fy=np.fft.fftfreq(size)[:,None];fx=np.fft.fftfreq(size)[None,:]
     frequency=np.sqrt(fx*fx+fy*fy)
-    band=np.exp(-(frequency/.036)**2)*(1-np.exp(-(frequency/.012)**2))
+    band=np.exp(-(frequency/.12)**2)*(1-np.exp(-(frequency/.04)**2))
     field=np.fft.ifft2(np.fft.fft2(field)*band).real
     field/=field.std()
-    peaks=np.clip((field-.25)/2.1,0,1)
+    peaks=np.clip((field-.45)/2.0,0,1)
     peaks=peaks*peaks*(3-2*peaks)
     return np.uint8(peaks*255)

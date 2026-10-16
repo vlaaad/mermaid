@@ -20,10 +20,10 @@ float sunVisible(vec3 p) {
     if(q.x<.002 || q.y<.002 || q.x>.998 || q.y>.998 || q.z<0.0 || q.z>1.0)return 1.0;
     // Filter visibility, never raw shadow depth. The soft depth transition also
     // resolves partial occlusion along a water interval instead of switching it.
-    vec2 pixel=q.xy*1024.0-.5,base=floor(pixel),f=fract(pixel);
-    vec2 uv=(base+.5)/1024.0;
-    vec4 depths=vec4(texture(sun_depth,uv).r,texture(sun_depth,uv+vec2(1,0)/1024.0).r,
-                     texture(sun_depth,uv+vec2(0,1)/1024.0).r,texture(sun_depth,uv+vec2(1,1)/1024.0).r);
+    vec2 pixel=q.xy*2048.0-.5,base=floor(pixel),f=fract(pixel);
+    vec2 uv=(base+.5)/2048.0;
+    vec4 depths=vec4(texture(sun_depth,uv).r,texture(sun_depth,uv+vec2(1,0)/2048.0).r,
+                     texture(sun_depth,uv+vec2(0,1)/2048.0).r,texture(sun_depth,uv+vec2(1,1)/2048.0).r);
     vec4 v=smoothstep(vec4(q.z-.0018),vec4(q.z+.0002),depths);
     return mix(mix(v.x,v.y,f.x),mix(v.z,v.w,f.x),f.y);
 }
@@ -52,10 +52,12 @@ void main() {
     float first=(plane-origin)/rate,stepLength=spacing/abs(rate);
     // Prefilter each interval's footprint on the aperture, so a camera move
     // cannot jump across a narrow beam between adjacent integration samples.
-    float apertureFootprint=length(dir.xz-dir.y*sun.xz/sun.y)*stepLength*4.0;
+    // Four quadrature taps filter along the integration interval rather than
+    // blurring a whole interval equally in every direction across the shafts.
+    float apertureFootprint=length(dir.xz-dir.y*sun.xz/sun.y)*stepLength;
     float intervalLod=log2(max(apertureFootprint,1.0));
     // One footprint per view ray; avoid a logarithm for every water sample.
-    float spread=max(intervalLod,log2(1.0+max(50.0-camera_pos.y,0.0)*.035));
+    float spread=max(intervalLod,log2(max(max(50.0-camera_pos.y,0.0)*.028,1.0)));
     vec2 apertureOrigin=(camera_pos.xz+(50.0-camera_pos.y)*sun.xz/sun.y)/64.0;
     vec2 apertureRate=(dir.xz-dir.y*sun.xz/sun.y)/64.0;
     // Beer-Lambert extinction along the view and the incoming sunlight path.
@@ -71,7 +73,12 @@ void main() {
             // Project onto the water plane along the sun direction. Irradiance
             // stays fixed along each light path, never in camera/screen space.
             vec2 aperture=apertureOrigin+apertureRate*((lo+hi)*.5);
-            float flux=.10+textureLod(solar_flux,aperture,spread).r*11.0;
+            vec2 tap=apertureRate*(hi-lo)*.125;
+            float energy=textureLod(solar_flux,aperture-tap*3.0,spread).r;
+            energy+=textureLod(solar_flux,aperture-tap,spread).r;
+            energy+=textureLod(solar_flux,aperture+tap,spread).r;
+            energy+=textureLod(solar_flux,aperture+tap*3.0,spread).r;
+            float flux=.04+energy*1.8;
             scatter+=sunVisible(p)*flux*(transmission-nextTransmission);
             transmission=nextTransmission;
             lo=hi;

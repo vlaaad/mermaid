@@ -24,13 +24,13 @@ const float STONE_CAUSTIC_RESPONSE=.35;
 const vec3 ROCK_AMBIENT_GAIN=vec3(1.8,1.4,1.15);
 const vec3 ROCK_SUN_GAIN=vec3(.05,.20,.25);
 // Interpolate comparisons, not depth: continuous PCF without a larger shadow map.
-float filteredShadow(vec2 uv,float receiver,vec2 slope) {
-    vec2 pixel=uv*1024.0-.5,base=floor(pixel),f=fract(pixel);
-    vec2 tap=(base+.5)/1024.0;
-    float a=step(receiver+dot(slope,tap-uv),texture(sun_depth,tap).r);
-    float b=step(receiver+dot(slope,tap+vec2(1,0)/1024.0-uv),texture(sun_depth,tap+vec2(1,0)/1024.0).r);
-    float c=step(receiver+dot(slope,tap+vec2(0,1)/1024.0-uv),texture(sun_depth,tap+vec2(0,1)/1024.0).r);
-    float d=step(receiver+dot(slope,tap+vec2(1,1)/1024.0-uv),texture(sun_depth,tap+vec2(1,1)/1024.0).r);
+float filteredShadow(highp vec2 uv,highp float receiver) {
+    highp vec2 pixel=uv*2048.0-.5,base=floor(pixel),f=fract(pixel);
+    highp vec2 tap=(base+.5)/2048.0;
+    float a=step(receiver,texture(sun_depth,tap).r);
+    float b=step(receiver,texture(sun_depth,tap+vec2(1,0)/2048.0).r);
+    float c=step(receiver,texture(sun_depth,tap+vec2(0,1)/2048.0).r);
+    float d=step(receiver,texture(sun_depth,tap+vec2(1,1)/2048.0).r);
     return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);
 }
 highp float bound(highp vec2 moments,highp float receiver) {
@@ -44,7 +44,7 @@ highp float nearVisibility(highp vec3 q) {
     highp float v=min(bound(m.xy,exp(32.0*(z-1.0))),bound(m.zw,-exp(-32.0*z)));
     return clamp((v-.15)/.85,0.0,1.0);
 }
-float visibility(vec3 p,vec3 normal,float ndl) {
+float visibility(highp vec3 p,vec3 normal,float ndl) {
     highp vec3 nearQ=(near_light_matrix*vec4(p+normal*.015,1.0)).xyz*.5+.5;
     float edge=min(min(nearQ.x,nearQ.y),min(1.0-nearQ.x,1.0-nearQ.y));
     float nearWeight=smoothstep(.015,.075,edge);
@@ -55,15 +55,13 @@ float visibility(vec3 p,vec3 normal,float ndl) {
     if(visual_debug.x>8.5 && visual_debug.x<9.5)return nearWeight;
     if(nearWeight>=1.0)return closeShadow;
     if(abs(light_matrix[3].w)<.0001)return 1.0;
-    vec4 light=light_matrix*vec4(p+normal*.025,1.0);
-    vec3 q=light.xyz/light.w*.5+.5;
-    vec3 dx=dFdx(q),dy=dFdy(q);
-    float det=dx.x*dy.y-dx.y*dy.x;
-    vec2 slope=vec2(dy.y*dx.z-dx.y*dy.z,dx.x*dy.z-dy.x*dx.z)/((abs(det)>.0000000001)?det:1.0);
-    slope=clamp(slope,vec2(-1.0),vec2(1.0));
+    // Caster rasterization supplies slope bias. Extrapolating receiver planes
+    // across beveled silhouettes caused the repeated triangular edge artifacts.
+    highp vec4 light=light_matrix*vec4(p+normal*.025,1.0);
+    highp vec3 q=light.xyz/light.w*.5+.5;
     if(q.x<.002 || q.y<.002 || q.x>.998 || q.y>.998 || q.z>1.0 || q.z<0.0)return 1.0;
-    float bias=.00015+.00012*(1.0-ndl);
-    return mix(filteredShadow(q.xy,q.z-bias,slope),closeShadow,nearWeight);
+    float bias=.00009+.00007*(1.0-ndl);
+    return mix(filteredShadow(q.xy,q.z-bias),closeShadow,nearWeight);
 }
 
 
@@ -96,7 +94,7 @@ void main() {
     if(params.x>.5 && params.x<1.5 && dot(geometric,sun)<0.0)geometric=-geometric;
     // Bias a thin fin toward the light on either side to avoid self-shadow acne.
     if(params.x>2.5 && params.x<3.5 && var_color.a>.37 && var_color.a<.62 && dot(geometric,sun)<0.0)geometric=-geometric;
-    float shadow=visibility(var_world,geometric,diffuse);
+    float shadow=visual_debug.x> -1.5 && visual_debug.x<-.5?1.0:visibility(var_world,geometric,diffuse);
     if(visual_debug.x>5.5) {out_fragColor=vec4(vec3(shadow),1.0);return;}
     float t=time_data.x;
     // Refraction projects a larger pattern onto receiving surfaces, absent in shade.

@@ -74,7 +74,7 @@ function init(self)
             if data.camera and data.look then self.inspect_camera=data end
             return state(self)
         end)
-        automation_bridge.command("mermaid.lighting",function(data) msg.post("@render:","lighting_debug",{mode=tonumber(data.mode) or 0}) return {mode=data.mode or 0} end)
+        automation_bridge.command("mermaid.lighting",function(data) msg.post("@render:","lighting_debug",{mode=tonumber(data.mode) or 0,static_only=data.static_only or false}) return {mode=data.mode or 0} end)
         automation_bridge.command("mermaid.resume",function() self.frozen=false return state(self) end)
         automation_bridge.describe("command","mermaid.capture",{description="Reset opening camera, player pose, seed-dependent scene, and animation time; freeze until input or resume."})
     end

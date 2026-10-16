@@ -29,7 +29,7 @@ function init(self)
     self.constants.time_data=vmath.vector4(3,0,0,0)
     self.constants.camera_pos=vmath.vector4(0,7,13,1)
     self.constants.fog_settings=vmath.vector4(0.062500,0.625000,0.945500,.0165)
-    self.shadow=target(1024,1024,true)
+    self.shadow=target(2048,2048,true)
     self.near_shadow=target(512,512,false,graphics.TEXTURE_FORMAT_RGBA32F)
     self.near_ping=target(512,512,false,graphics.TEXTURE_FORMAT_RGBA32F)
     self.blur_constants=render.constant_buffer()
@@ -61,33 +61,38 @@ function update(self)
     local sun=vmath.normalize(vmath.vector3(.35,.90,-.24))
     local right=vmath.normalize(vmath.cross(-sun,vmath.vector3(0,0,1)))
     local up=vmath.normalize(vmath.cross(right,-sun))
-    local desired=vmath.vector3(camera.x,0,camera.z-25)
-    local texel=100/1024
-    local x=vmath.dot(desired,right);local y=vmath.dot(desired,up)
-    local center=desired+right*(math.floor(x/texel+.5)*texel-x)+up*(math.floor(y/texel+.5)*texel-y)
-    local light_view=vmath.matrix4_look_at(center+sun*80,center,vmath.vector3(0,0,1))
-    local light_proj=vmath.matrix4_orthographic(-50,50,-50,50,1,150)
-    local far_caster_frustum=vmath.matrix4_orthographic(-52,52,-52,52,1,150)*light_view
+    -- All scenery is currently rigid. Cache full-world sunlight coverage so
+    -- orbiting the camera cannot move its boundary through visible shadows.
+    -- Future currents/crowds must invalidate this cache when their actors move.
+    local center=vmath.vector3(10,0,-55)
+    local light_view=vmath.matrix4_look_at(center+sun*120,center,vmath.vector3(0,0,1))
+    local light_proj=vmath.matrix4_orthographic(-96,96,-96,96,1,240)
     self.constants.light_matrix=light_proj*light_view
     render.set_depth_mask(true)
     render.enable_state(graphics.STATE_DEPTH_TEST)
     render.disable_state(graphics.STATE_CULL_FACE)
     render.disable_state(graphics.STATE_BLEND)
-    render.set_render_target(self.shadow)
-    render.set_viewport(0,0,1024,1024)
-    render.clear({[graphics.BUFFER_TYPE_COLOR0_BIT]=vmath.vector4(1),[graphics.BUFFER_TYPE_DEPTH_BIT]=1})
-    render.set_view(light_view)
-    render.set_projection(light_proj)
-    render.enable_material("shadow")
-    for _,category in ipairs({0,1,2,3,6}) do
-        if category==0 then
-            render.enable_state(graphics.STATE_CULL_FACE)
-            render.set_cull_face(graphics.FACE_TYPE_BACK)
-        else render.disable_state(graphics.STATE_CULL_FACE) end
-        render.draw(self.casters[category],{constants=self.shadow_constants,frustum=far_caster_frustum})
+    if not self.shadow_valid then
+        render.set_render_target(self.shadow)
+        render.set_viewport(0,0,2048,2048)
+        render.clear({[graphics.BUFFER_TYPE_COLOR0_BIT]=vmath.vector4(1),[graphics.BUFFER_TYPE_DEPTH_BIT]=1})
+        render.set_view(light_view)
+        render.set_projection(light_proj)
+        render.enable_material("shadow")
+        render.enable_state(graphics.STATE_POLYGON_OFFSET_FILL)
+        render.set_polygon_offset(1,1)
+        for _,category in ipairs({0,1,2,6,8}) do
+            if category==0 or category==8 then
+                render.enable_state(graphics.STATE_CULL_FACE)
+                render.set_cull_face(category==0 and graphics.FACE_TYPE_FRONT or graphics.FACE_TYPE_BACK)
+            else render.disable_state(graphics.STATE_CULL_FACE) end
+            render.draw(self.casters[category],{constants=self.shadow_constants,frustum=light_proj*light_view})
+        end
+        render.disable_material()
+        render.disable_state(graphics.STATE_POLYGON_OFFSET_FILL)
+        render.disable_state(graphics.STATE_CULL_FACE)
+        self.shadow_valid=true
     end
-    render.disable_material()
-    render.disable_state(graphics.STATE_CULL_FACE)
 
     -- Small stable near cascade. Filter moments once, rather than dozens of
     -- shadow comparisons per full-resolution receiver pixel.
@@ -109,9 +114,11 @@ function update(self)
     for _,category in ipairs({0,1,2,3,6,8}) do
         if category==0 or category==8 then
             render.enable_state(graphics.STATE_CULL_FACE)
-            render.set_cull_face(graphics.FACE_TYPE_BACK)
+            render.set_cull_face(category==0 and graphics.FACE_TYPE_FRONT or graphics.FACE_TYPE_BACK)
         else render.disable_state(graphics.STATE_CULL_FACE) end
-        render.draw(self.casters[category],{constants=self.shadow_constants,frustum=near_caster_frustum})
+        if category~=3 or self.constants.visual_debug.y<.5 then
+            render.draw(self.casters[category],{constants=self.shadow_constants,frustum=near_caster_frustum})
+        end
     end
     render.disable_material()
     render.disable_state(graphics.STATE_CULL_FACE)
@@ -224,8 +231,9 @@ function update(self)
 end
 
 function on_message(self,id,message)
+    if id==hash("shadow_dirty") then self.shadow_valid=false end
     if id==hash("solar_flux") then self.solar_flux=message.texture end
-    if id==hash("lighting_debug") then self.constants.visual_debug=vmath.vector4(message.mode,0,0,0) end
+    if id==hash("lighting_debug") then self.constants.visual_debug=vmath.vector4(message.mode,message.static_only and 1 or 0,0,0) end
     if id==hash("scene_camera") then
         self.view=message.view
         self.constants.camera_pos=message.position

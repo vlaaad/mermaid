@@ -16,7 +16,7 @@ project=editor.open_project(ROOT,start_if_needed=False)
 g=project.build_and_run(focus=False,timeout=180)
 def v(x,y,z):return dict(x=x,y=y,z=z)
 def capture(name,pose,mode=0):
- g.command('mermaid.capture',pose);g.command('mermaid.lighting',dict(mode=mode));g.wait_frames(5)
+ g.command('mermaid.capture',pose);g.command('mermaid.lighting',dict(mode=mode,static_only=6<=mode<=9));g.wait_frames(5)
  path=args.output/(name+'.png');path.write_bytes(g.screenshot(after_frames=2).read_bytes())
  return np.asarray(Image.open(path).convert('RGB'))
 try:
@@ -56,13 +56,28 @@ try:
  capture('rays',dict(camera=v(0,7,13),look=v(11,27,-44)))
  capture('rays-offset',dict(position=v(1,4.8,4),camera=v(2,7,13),look=v(13,27,-44)))
  capture('sun',dict(camera=v(-.4,7,13),look=v(16,50,0)))
+ for mode in (0,-1,7):
+  capture(f'columns-{mode}',dict(camera=v(20,27,-25),look=v(40,36,-67)),mode)
+ # The far cache omits the character; compare static scenery separately so her
+ # detailed local shadow does not hide a broken static-map transition.
+ for name,pose in {
+  'back':dict(position=v(.4,4.8,-18.2),camera=v(6.15,9.92,-24.43),look=v(-10,-.75,-6.65)),
+  'right':dict(position=v(14,3,-15),camera=v(18,7,-8),look=v(9,-3,-22)),
+  'left':dict(position=v(-8,3,-12),camera=v(-3,9,-5),look=v(-14,-3,-22)),
+ }.items():
+  channels={mode:capture(f'coverage-{name}-{mode}',pose,mode)[...,0]/255 for mode in (0,6,7,9,12)}
+  near,far,weight,sand=(channels[mode] for mode in (6,7,9,12))
+  ground=(weight>.99)&(sand>.99)
+  assert ground.sum()>1000,'Coverage fixture has no ground'
+  disagreement=((near<.1)&(far>.9))|((near>.9)&(far<.1))
+  results[f'{name}_ground_interior_disagreement']=float(disagreement[ground].mean())
  (args.output/'results.json').write_text(json.dumps(results,indent=2)+'\n')
  print(json.dumps(results,indent=2),flush=True)
  if not args.baseline:
   assert results['column_open_edges']==0,('Column mesh has holes',results)
   assert min(results[f'pass_overlap_time_{t}'] for t in (3,7))>.995,('Visible and shadow geometry differ',results)
   assert results['visible_actor_pixels_moved']==0,('Environmental actors still animate in the shader',results)
-  assert max(results[f'{view}_ground_interior_disagreement'] for view in ('wide','close'))<.001,('Near/far shadow interiors disagree',results)
+  assert max(results[f'{view}_ground_interior_disagreement'] for view in ('wide','close','back','right','left'))<.001,('Near/far shadow interiors disagree',results)
 finally:
  g.command('mermaid.lighting',dict(mode=0));g.command('mermaid.capture',{})
  if args.keep_running:g.command('mermaid.resume',{});g.close()
