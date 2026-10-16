@@ -1,0 +1,8 @@
+name: "background"
+tags: "blit"
+vertex_program: "/render/blit.vp"
+fragment_program: "/render/background.fp"
+vertex_space: VERTEX_SPACE_LOCAL
+fragment_constants { name: "inverse_view_projection" type: CONSTANT_TYPE_USER_MATRIX4 }
+fragment_constants { name: "camera_pos" type: CONSTANT_TYPE_USER }
+fragment_constants { name: "fog_settings" type: CONSTANT_TYPE_USER }

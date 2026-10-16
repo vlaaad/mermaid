@@ -24,12 +24,12 @@
     "bytes": 115764
   },
   "ring": {
-    "triangles": 264,
-    "bytes": 39112
+    "triangles": 336,
+    "bytes": 49516
   },
   "kelp": {
-    "triangles": 444,
-    "bytes": 65076
+    "triangles": 672,
+    "bytes": 97908
   },
   "sponge": {
     "triangles": 540,
@@ -37,11 +37,11 @@
   },
   "coral_pink": {
     "triangles": 1026,
-    "bytes": 148896
+    "bytes": 148900
   },
   "coral_blue": {
     "triangles": 1026,
-    "bytes": 148896
+    "bytes": 148900
   },
   "fish": {
     "triangles": 90,
@@ -56,8 +56,8 @@
     "bytes": 27912
   },
   "mermaid": {
-    "triangles": 13324,
-    "bytes": 1919800
+    "triangles": 18592,
+    "bytes": 2678404
   },
   "seabed": {
     "triangles": 2294,
@@ -76,9 +76,9 @@
     "bytes": 1316
   },
   "world": {
-    "instances": 571,
-    "source_placements": 571,
-    "collision_boxes": 197,
+    "instances": 1510,
+    "source_placements": 1510,
+    "collision_boxes": 1193,
     "seed": 73
   }
 }

@@ -31,7 +31,7 @@ show_made_with_defold = 0
 max_instances = 2048
 
 [model]
-max_count = 1024
+max_count = 2048
 
 [project]
 title = mermaid

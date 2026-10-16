@@ -45,9 +45,9 @@ local function resolve(position)
             end
         end
     end
-    position.x=clamp(position.x,-34,34)
-    position.y=clamp(position.y,2.6,23)
-    position.z=clamp(position.z,-105,9)
+    position.x=clamp(position.x,-52,58)
+    position.y=clamp(position.y,-1.5,36)
+    position.z=clamp(position.z,-124,9)
     return position
 end
 
