@@ -1,4 +1,4 @@
-"""Build/run Mermaid, capture its frozen opening, exit the game, then compare.
+"""Build/run Mermaid, capture its frozen opening, exit the game, then make one diff PNG.
 
 Run from any directory: python3 /path/to/mermaid/tools/capture_diff.py
 The Defold editor is reused or started as needed; the editor stays open.
@@ -54,7 +54,7 @@ def run(reference, output, *, max_mae=None):
     report = compare(reference, capture, output, regions=regions, max_mae=max_mae)
     print(json.dumps({
         "screenshot": str(capture),
-        "report": str(output / "index.html"),
+        "diff": str(output / "diff.png"),
         "metrics": report["metrics"],
         "mae_gate": report["mae_gate"],
     }, indent=2))

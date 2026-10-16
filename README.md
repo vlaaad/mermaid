@@ -30,7 +30,7 @@ One command, no required arguments:
 python3 tools/capture_diff.py
 ```
 - Reuses/starts the editor, builds/launches a native game, waits for `mermaid.ready`, freezes the opening at time3, warms30 frames, captures full resolution, exits the game, THEN runs the image comparison. The editor stays open. Game cleanup runs even if capture fails.
-- Outputs `artifacts/image-diff/capture.png` (original screenshot), `capture.json` (state/framebuffer), and `index.html` plus diff images/metrics. Paths default relative to the repository, so the script also works when invoked from another directory.
+- Outputs `artifacts/image-diff/capture.png` (original screenshot), `capture.json` (state/framebuffer), and ONE difference image `diff.png`, plus `metrics.json` for diagnostic numbers. No HTML, heatmap, overlay, or comparison sheet. Paths default relative to the repository, so the script also works when invoked from another directory.
 - Optional `--output DIRECTORY`, `--reference IMAGE`, `--max-mae-percent 4`. No color-error gate by default; successful workflow exits0. Explicit gate failure exits1; build/capture/comparison failure exits2. Never interpret color MAE as a visual-fidelity percentage.
 
 ```
@@ -68,7 +68,7 @@ python3 tools/serve.py
 python3 tools/image_diff.py Blonde-Mermaid-in-Atlantis-Ruins.png artifacts/scene/opening.png --regions tools/reference_regions.json
 python3 -m unittest tools.test_image_diff -v
 ```
-- Emits `artifacts/image-diff/index.html` (wipe + regional table), `comparison.png`, fixed-scale `heatmap.png`, highlighted overlay, hashes/settings/metrics JSON.
+- Emits exactly one review image: `artifacts/image-diff/diff.png`, with hashes/settings/diagnostic numbers in `metrics.json`. Old generated HTML, heatmap, highlighted overlay and comparison-sheet files are removed from the output directory.
 - Default analysis width960, matching aspect required within .5%. Explicit `--fit contain` letterboxes mismatch and records warning. Never silently crop/warp/grade to lower error.
 - RGB MAE = average absolute RGB channel error /255 x100. SSIM uses 7x7 sample covariance, RGB mean; best1, can be negative. Changed pixels default mean RGB error>10/255. Blurred MAE is only coarse palette/layout diagnostic.
 - `--max-mae-percent 10` is an optional MAE-only gate, not 90% fidelity. Global score can hide a missing small subject; check mermaid/ruin ROIs and actual images.
@@ -113,7 +113,7 @@ python3 -m unittest tools.test_image_diff -v
 ## Current browser evidence
 - Bob HTML5 build succeeds without launching Firefox. Actual browser screenshot: `artifacts/scene/browser.png` (1280×720). At capture: 600 RAF samples, mean27.37ms /36.54 FPS, p9566.70ms, trace disabled, ANGLE Intel HD530. Average clears30; spikes remain. Do not claim locked30 or60.
 - Browser W key reached input and changed Z4.00→3.99 immediately, with frozen false/speed.35m/s; full held-key/boost/vertical/orbit tests passed natively.
-- Browser reference diff: MAE11.8050%, SSIM0.48127, coarse9.43657%. Report `artifacts/browser-diff/index.html`; native report remains `artifacts/image-diff/index.html`.
+- Browser reference diff: MAE11.8050%, SSIM0.48127, coarse9.43657%. These are historical scores; current native difference image is `artifacts/image-diff/diff.png`. The generator no longer emits HTML.
 - Normal playable tab is `http://127.0.0.1:8765/`. Local preview was relaunched detached (`subprocess.Popen(...,start_new_session=True)`) because a long-lived exec session received SIGTERM and broke capture POST. PID in `artifacts/server.pid`, logs `artifacts/server.log`. Before relaunch, inspect stored PID/port; avoid duplicate servers. Stop only the known agent-owned server when required.
 
 ## Rollback and user feedback — 2026-10-16
@@ -131,4 +131,11 @@ python3 -m unittest tools.test_image_diff -v
 - Working geometry now has an open basin with staggered terraces/isolated platforms, seabedY=-4.25, waterY42, square masonry window, curved fuller tail/swept flukes, fingers, larger wavy hair clumps. Shared actors remain separate. Generator now calculates tube normals from surface derivatives, uses tube UVs, and smooth scalp normals.
 - Added smooth sand material, packed caustics/stone/water channels, irregular animated water shading, directional fog background shared with object fog, and corrected receiver-plane shadows. NO opaque depth prepass. Material declaration cleanup retained only for shaders that use the constants.
 - User paused scene work to request tooling. Finish the zero-argument capture/diff command without resuming scene edits. Art revision still needs animated/orbit visual inspection, browser build/profiling, and further composition/model/surface refinement. Current diagnostic pass4: MAE11.8649%, SSIM0.48805, changed pixels87.23%; not a claim of visual fidelity or acceptance.
-- `python3 tools/capture_diff.py` verified end to end with NO arguments: native build/run, frozen capture, engine exit confirmed by bridge before diff, report emitted, exit0. Capture state confirms frozen=true and metrics source path points to the newly saved capture.png.
+- `python3 tools/capture_diff.py` verified end to end with NO arguments: native build/run, frozen capture, engine exit confirmed by bridge before diff, difference image emitted, exit0. Capture state confirms frozen=true and metrics source path points to the newly saved capture.png.
+
+## Single diff image — user correction, 2026-10-16
+- User wants ONE pure difference image, not HTML, a comparison sheet, an overlay or two error maps. `python3 tools/capture_diff.py` still requires no arguments and now writes `artifacts/image-diff/diff.png` after capture/engine exit. `capture.png` is the original game screenshot, not a second diff.
+- For each corresponding pixel after the unchanged960px preparation, error=max(abs(referenceR-gameR), abs(referenceG-gameG), abs(referenceB-gameB)). Display grayscale=round(255*sqrt(error/255)). Black means equal; increasing error becomes brighter. Fixed square-root contrast boost exposes small differences without saturating at an arbitrary threshold or normalizing each run separately. Maximum error255 reaches white. A color-only change is visible even if luminance is similar.
+- Numeric MAE/SSIM calculations remain unchanged and are ONLY diagnostics. Goal is visual similarity: composition and apparent world scale, geometry/silhouettes, light direction and contrast, shadows, fog/depth, materials/textures, color, character/hair/tail. Inspect actual reference and capture plus the one diff on every future art iteration. Neither MAE nor the diff determines artistic acceptance alone. Motion/control feel still requires gameplay inspection.
+- Old pink threshold map covered almost the entire scene; old colored heatmap averaged channel errors and used arbitrary hues. Removed both. Ten known-value checks now cover black for equality, color-only differences, symmetric subtraction/no uint8 wrapping, increasing brightness with error, and removal of old generated report files.
+- Reverified the full zero-argument capture/exit/diff sequence after this change: exit0, one grayscale960×540 diff.png, original capture.png, capture.json and metrics.json; no HTML or legacy diff images remain in the default output directory.

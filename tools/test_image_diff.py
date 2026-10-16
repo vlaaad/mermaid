@@ -8,7 +8,7 @@ import unittest
 import numpy as np
 from PIL import Image
 
-from tools.image_diff import compare, metrics, prepare, ssim_rgb
+from tools.image_diff import compare, difference_image, metrics, prepare, ssim_rgb
 
 
 class ImageDiffTests(unittest.TestCase):
@@ -63,8 +63,38 @@ class ImageDiffTests(unittest.TestCase):
             self.assertAlmostEqual(report["regions"]["subject"]["rgb_mae_percent"], 100)
             self.assertTrue(report["mae_gate"]["passed"])
             self.assertEqual(json.loads((root / "out/metrics.json").read_text())["metric_version"], 1)
-            for name in ("index.html", "comparison.png", "heatmap.png", "highlighted.png"):
-                self.assertTrue((root / "out" / name).is_file())
+            self.assertEqual({p.name for p in (root / "out").iterdir()}, {"diff.png", "metrics.json"})
+            self.assertEqual(report["visualization"]["image"], "diff.png")
+
+    def test_difference_is_black_for_identical_images(self):
+        pixels = np.random.default_rng(5).integers(0, 256, (16, 20, 3), dtype=np.uint8)
+        image = Image.fromarray(pixels)
+        self.assertFalse(np.asarray(difference_image(image, image)).any())
+
+    def test_difference_is_monotonic_and_preserves_color_only_error(self):
+        a = Image.new("RGB", (3, 1), (0, 64, 0))
+        b = Image.new("RGB", (3, 1), (16, 64, 0))
+        b.putpixel((1, 0), (0, 0, 64))  # Similar brightness, different color.
+        b.putpixel((2, 0), (255, 64, 0))
+        result = difference_image(a, b)
+        self.assertEqual(result.getpixel((0, 0)), 64)
+        self.assertEqual(result.getpixel((1, 0)), 128)
+        self.assertEqual(result.getpixel((2, 0)), 255)
+        np.testing.assert_array_equal(np.asarray(result), np.asarray(difference_image(b, a)))
+        self.assertLess(result.getpixel((0, 0)), result.getpixel((1, 0)))
+        self.assertLess(result.getpixel((1, 0)), result.getpixel((2, 0)))
+
+    def test_old_html_and_diff_images_are_removed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "input.png"
+            Image.new("RGB", (20, 20), "white").save(source)
+            output = root / "out"
+            output.mkdir()
+            for name in ("index.html", "heatmap.png", "highlighted.png", "reference.png", "candidate.png", "comparison.png"):
+                (output / name).write_text("obsolete generated report")
+            compare(source, source, output, width=20)
+            self.assertEqual({p.name for p in output.iterdir()}, {"diff.png", "metrics.json"})
 
     def test_report_cannot_overwrite_source_image(self):
         with tempfile.TemporaryDirectory() as tmp:

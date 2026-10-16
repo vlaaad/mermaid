@@ -1,4 +1,6 @@
-"""Compare reference art with an actual rendered frame; no alignment or color correction.
+"""Make one pixel-difference PNG from reference art and an actual rendered frame.
+
+No alignment or color correction. Pixel metrics are diagnostics, not art acceptance.
 
 Requires Pillow and NumPy. SSIM uses a 7x7 uniform window, sample covariance,
 and standard K1=.01, K2=.03 on RGB values in [0, 1].
@@ -6,12 +8,11 @@ and standard K1=.01, K2=.03 on RGB values in [0, 1].
 
 import argparse
 import hashlib
-import html
 import json
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter, ImageOps
+from PIL import Image, ImageFilter, ImageOps
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -70,17 +71,25 @@ def metrics(first, second, pixel_threshold=10):
     }, error
 
 
-def heatmap(error):
-    # Fixed scale between comparisons: never renormalize each image to its maximum.
-    stops = np.array([0, 0.05, 0.10, 0.25, 0.50, 1.0])
-    colors = np.array([[5, 12, 30], [15, 65, 130], [0, 190, 210], [255, 218, 50], [255, 65, 35], [255, 245, 245]])
-    mapped = np.stack([np.interp(error, stops, colors[:, c]) for c in range(3)], axis=2)
-    return Image.fromarray(np.uint8(mapped))
+DIFF_GAMMA = .5
+LEGACY_FILES = ("reference.png", "candidate.png", "heatmap.png", "highlighted.png", "comparison.png", "index.html")
+
+
+def difference_image(first, second):
+    """One grayscale error image: equal=black, greater channel error=brighter.
+
+    Use the largest absolute RGB channel difference so color errors cannot cancel.
+    A fixed square-root curve exposes small differences without clipping large
+    ones or normalizing each run differently. Only maximal error reaches white.
+    """
+    delta = np.abs(np.asarray(first, dtype=np.int16) - np.asarray(second, dtype=np.int16))
+    error = delta.max(axis=2) / 255.0
+    return Image.fromarray(np.rint(255 * error ** DIFF_GAMMA).astype(np.uint8))
 
 
 def compare(reference_path, candidate_path, output, *, width=960, fit="strict", pixel_threshold=10, regions=None, max_mae=None):
     output = Path(output)
-    generated_names = ("reference.png", "candidate.png", "heatmap.png", "highlighted.png", "comparison.png", "metrics.json", "index.html")
+    generated_names = (*LEGACY_FILES, "diff.png", "metrics.json")
     if any(Path(source).resolve() == (output / name).resolve() for source in (reference_path, candidate_path) for name in generated_names):
         raise ValueError("Output would overwrite an input image; choose a different output directory")
     if not 0 <= pixel_threshold <= 255:
@@ -89,7 +98,7 @@ def compare(reference_path, candidate_path, output, *, width=960, fit="strict", 
         raise ValueError("MAE limit must be between 0 and 100 percent")
     original_ref, original_candidate = load_rgb(reference_path), load_rgb(candidate_path)
     ref, candidate, aspect_error = prepare(original_ref, original_candidate, width, fit)
-    scores, error = metrics(ref, candidate, pixel_threshold)
+    scores, _ = metrics(ref, candidate, pixel_threshold)
     # Coarse diagnostic only: exposes palette/layout progress without treating it as fidelity.
     sigma = width / 120
     coarse, _ = metrics(ref.filter(ImageFilter.GaussianBlur(sigma)), candidate.filter(ImageFilter.GaussianBlur(sigma)), pixel_threshold)
@@ -108,52 +117,18 @@ def compare(reference_path, candidate_path, output, *, width=960, fit="strict", 
         "reference": {"path": str(Path(reference_path).resolve()), "sha256": hashlib.sha256(Path(reference_path).read_bytes()).hexdigest(), "size": list(original_ref.size)},
         "candidate": {"path": str(Path(candidate_path).resolve()), "sha256": hashlib.sha256(Path(candidate_path).read_bytes()).hexdigest(), "size": list(original_candidate.size)},
         "settings": {"analysis_size": list(ref.size), "fit": fit, "aspect_ratio_error_percent": aspect_error * 100, "pixel_threshold_rgb_levels": pixel_threshold, "blur_sigma_pixels": sigma, "ssim": "RGB mean, 7x7 uniform window, sample covariance, K1=.01 K2=.03, border excluded", "alpha": "composite on black", "color": "encoded RGB; no exposure, alignment, warp, or color matching"},
+        "visualization": {"version": 3, "image": "diff.png", "difference": "maximum absolute RGB channel difference", "display_curve": "255 * sqrt(max(abs(reference RGB - capture RGB)) / 255)", "scale": "fixed across runs; equal=black, larger error=brighter, maximum error=white; no clipping or per-image normalization"},
         "metrics": scores, "regions": regional,
         "mae_gate": None if max_mae is None else {"limit_percent": max_mae, "passed": scores["rgb_mae_percent"] <= max_mae},
         "warnings": ["Aspect ratios differ: candidate was letterboxed, not cropped or stretched."] if aspect_error > 0.005 else [],
     }
     output.mkdir(parents=True, exist_ok=True)
-    ref.save(output / "reference.png")
-    candidate.save(output / "candidate.png")
-    heat = heatmap(error)
-    heat.save(output / "heatmap.png")
-    highlighted = np.asarray(candidate).copy()
-    changed = error > pixel_threshold / 255
-    highlighted[changed] = (highlighted[changed] * 0.35 + np.array([255, 30, 90]) * 0.65).astype(np.uint8)
-    overlay = Image.fromarray(highlighted)
-    overlay.save(output / "highlighted.png")
-
-    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-    from PIL import ImageFont
-    try:
-        font = ImageFont.truetype(font_path, 17)
-    except OSError:
-        font = ImageFont.load_default()
-    sheet = Image.new("RGB", (ref.width * 2, (ref.height + 40) * 2 + 52), "#101827")
-    draw = ImageDraw.Draw(sheet)
-    for index, (label, picture) in enumerate((("REFERENCE", ref), ("RENDERED FRAME", candidate), ("ABSOLUTE RGB ERROR — fixed scale", heat), (f"HIGHLIGHT: pixel error > {pixel_threshold}/255", overlay))):
-        x, y = (index % 2) * ref.width, (index // 2) * (ref.height + 40)
-        draw.text((x + 14, y + 10), label, font=font, fill="white")
-        sheet.paste(picture, (x, y + 40))
-    draw.text((14, sheet.height - 36), f"RGB MAE {scores['rgb_mae_percent']:.2f}%    SSIM {scores['ssim_rgb']:.4f}    Changed pixels {scores['changed_pixels_percent']:.2f}% | MAE is not a percentage of visual fidelity", font=font, fill="white")
-    sheet.save(output / "comparison.png")
+    difference_image(ref, candidate).save(output / "diff.png")
     (output / "metrics.json").write_text(json.dumps(report, indent=2) + "\n")
-
-    rows = "".join(f"<tr><td>{html.escape(name)}</td><td>{m['rgb_mae_percent']:.2f}%</td><td>{m['ssim_rgb']:.4f}</td><td>{m['changed_pixels_percent']:.2f}%</td></tr>" for name, m in {"whole image": scores, **regional}.items())
-    page = """<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Reference / rendered frame comparison</title>
-<style>body{font:16px system-ui;background:#0e1727;color:#eaf2fc;max-width:1160px;margin:32px auto;padding:0 24px}h1{font-size:28px}p{line-height:1.5;color:#c0d0e4}table{border-collapse:collapse;width:100%;margin:24px 0}th,td{text-align:left;padding:12px;border-bottom:1px solid #334357} .viewer{position:relative;line-height:0;overflow:hidden}.viewer img{width:100%}.viewer img.top{position:absolute;inset:0;height:100%;clip-path:inset(0 50% 0 0)}input{width:100%;margin:18px 0}label,figcaption{display:block;margin:12px 0} .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.grid img{width:100%}figure{margin:0}.warning{color:#ffd081}</style>
-<h1>Reference / rendered frame</h1><p>Drag to reveal the reference on the left and the rendered frame on the right. Scores describe aligned image appearance, not correctness of the 3D world.</p>
-WARNINGS
-<div class="viewer"><img src="candidate.png" alt="Rendered frame"><img class="top" id="reference" src="reference.png" alt="Reference image"></div>
-<label for="split">Wipe position <output id="value">50%</output></label><input id="split" type="range" min="0" max="100" value="50">
-<script>document.querySelector('#split').addEventListener('input',e=>{document.querySelector('#reference').style.clipPath=`inset(0 ${100-e.target.value}% 0 0)`;document.querySelector('#value').textContent=e.target.value+'%'})</script>
-<table><thead><tr><th>Region</th><th>RGB MAE ↓</th><th>SSIM ↑</th><th>Changed pixels ↓</th></tr></thead><tbody>ROWS</tbody></table>
-<p>MAE: average absolute RGB channel difference / 255 × 100. SSIM: structural similarity, best = 1; it can be negative. Changed pixels: mean RGB error above THRESHOLD/255. Coarse blurred MAE: COARSE%. These measures are complementary; no combined “fidelity percentage” is claimed.</p>
-<div class="grid"><figure><img src="heatmap.png" alt="Fixed-scale error heatmap"><figcaption>Absolute RGB error: dark blue 0%, blue 5%, cyan 10%, yellow 25%, red 50%, white 100%. Scale stays fixed.</figcaption></figure><figure><img src="highlighted.png" alt="Differences highlighted in pink"><figcaption>Pixels exceeding the error threshold highlighted in pink.</figcaption></figure></div>
-<p>VIEWPORT. No automatic camera alignment, cropping, exposure correction, or color matching. Transparent pixels composite on black. Full parameters, source hashes, and optional MAE gate are in <a href="metrics.json">metrics.json</a>. A low color error alone does not establish a faithful reconstruction.</p></html>"""
-    page = page.replace("WARNINGS", "".join(f'<p class="warning">{html.escape(warning)}</p>' for warning in report["warnings"]))
-    page = page.replace("ROWS", rows).replace("THRESHOLD", str(pixel_threshold)).replace("COARSE", f"{scores['blurred_rgb_mae_percent']:.2f}").replace("VIEWPORT", f"Analysis viewport: {ref.width} × {ref.height}")
-    (output / "index.html").write_text(page)
+    # This tool reserves these legacy output names. Remove obsolete reports so
+    # the directory presents one current review image, not stale visualizations.
+    for name in LEGACY_FILES:
+        (output / name).unlink(missing_ok=True)
     return report
 
 
@@ -172,7 +147,7 @@ def main():
         report = compare(args.reference, args.candidate, args.output, width=args.width, fit=args.fit, pixel_threshold=args.pixel_threshold, regions=json.loads(args.regions.read_text()) if args.regions else None, max_mae=args.max_mae_percent)
     except (ValueError, OSError) as exc:
         parser.exit(2, f"Cannot compare images: {exc}\n")
-    print(json.dumps({"metrics": report["metrics"], "warnings": report["warnings"], "mae_gate": report["mae_gate"], "report": str((args.output / 'index.html').resolve())}, indent=2))
+    print(json.dumps({"metrics": report["metrics"], "warnings": report["warnings"], "mae_gate": report["mae_gate"], "diff": str((args.output / 'diff.png').resolve())}, indent=2))
     return 1 if report["mae_gate"] and not report["mae_gate"]["passed"] else 0
 
 
