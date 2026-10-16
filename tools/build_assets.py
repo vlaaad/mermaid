@@ -465,14 +465,14 @@ def mermaid():
             for ids in ([0,1,2],[0,2,3]):m.tri(*(pts[k] for k in ids),(*tuple(c*(1+.025*math.sin(j*3.3)) for c in hair),.75),uv=[uv[k] for k in ids],normals=[ns[k] for k in ids])
     hr=random.Random(184)
     for lock in range(30):
-        rootx=hr.uniform(-.26,.27); rooty=hr.uniform(1.77,2.15); rootz=hr.uniform(-.08,.05)
+        rootx=hr.uniform(-.26,.27); rooty=hr.uniform(1.55,1.86); rootz=hr.uniform(-.08,.05)
         length=hr.uniform(1.1,1.95); phase=hr.random()*math.tau
         width=hr.uniform(.17,.23) if lock<8 else (hr.uniform(.055,.11) if lock<20 else hr.uniform(.018,.045))
         centers=[]
         for j in range(18):
             t=j/17
             centers.append((rootx-math.sin(t*math.pi/2)*(.50+length*.42)+math.sin(t*10+phase)*.20*math.sin(t*math.pi),
-                            rooty-t**1.12*length*.88+math.sin(t*8+phase)*.20*t,
+                            rooty-t**1.12*length*.75+math.sin(t*8+phase)*.20*t,
                             rootz+(1-math.cos(t*math.pi/2))*length*.57+math.sin(t*7+phase)*.18*t))
         shade=hr.uniform(.90,1.10)
         m.tube(centers,[(width*(.6+.6*math.sin(math.pi*j/17))*(1-j/17)**.50+.001,.055*(1-j/17)**.7+.001) for j in range(18)],(*tuple(c*shade for c in (.84,.66,.37)),.75),10)
