@@ -144,7 +144,7 @@ void main() {
     vec3 sunlight=vec3(1.38,1.26,.77);
     if(roughStone) { materialAmbient*=ROCK_AMBIENT_GAIN;sunlight*=ROCK_SUN_GAIN; }
     vec3 shaded=base*(materialAmbient+sunlight*diffuse*shadow)*(.95+weather*.05);
-    float causticResponse=params.x>7.5?1.0:STONE_CAUSTIC_RESPONSE;
+    float causticResponse=params.x>7.5?.56:STONE_CAUSTIC_RESPONSE;
     shaded+=vec3(.78,.88,.53)*pattern*(max(n.y,0.0)*.65+diffuse*.35)*shadow*CAUSTIC_GAIN*causticResponse;
     if(params.x<.5 && (base.r>.45 || base.b>.55))shaded+=base*.18;
     if(params.x>0.5 && params.x<1.5) {
