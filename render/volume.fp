@@ -35,27 +35,34 @@ void main() {
     // Integrate actual world-space water up to the opaque surface. No ray cards.
     // Surface ripples modulate sunlight along parallel refracted light paths.
     float limit=min(travel,80.0);
-    float stride=limit/32.0;
-    float jitter=fract(dot(floor(gl_FragCoord.xy),vec2(.75487766,.56984029)));
+    float stride=limit/24.0;
+    // Midpoint integration is spatially continuous. A static per-pixel hash at
+    // quarter resolution imprints a 4px checker/noise pattern on the ceiling.
+    float jitter=.5;
     float scatter=0.0;
-    for(int i=0;i<32;i++) {
+    for(int i=0;i<24;i++) {
         float d=(float(i)+jitter)*stride;
         vec3 p=camera_pos.xyz+dir*d;
-        vec2 surface=p.xz+(50.0-p.y)*vec2(.389,-.267);
-        vec2 wave=vec2(sin(surface.y*.35+time_data.x*.11),cos(surface.x*.29-time_data.x*.09))*.6;
-        vec2 s=surface+wave;
-        vec2 a=(s-vec2(18.1,-39.2))/vec2(1.5,8.0);
-        vec2 b=(s-vec2(31.1,-57.2))/vec2(2.2,10.0);
-        vec2 c=(s-vec2(6.1,-31.2))/vec2(1.25,7.0);
-        vec2 e=(s-vec2(20.1,-20.2))/vec2(1.8,7.5);
-        float aperture=exp(-dot(a,a))+exp(-dot(b,b))*.8+exp(-dot(c,c))*.7+exp(-dot(e,e))*.6;
-        float filaments=.72+.20*sin(s.x*5.2+s.y*.65+time_data.x*.13)+.08*sin(s.x*11.0+s.y*.35);
-        aperture*=filaments;
+        float below=50.0-p.y;
+        vec2 surface=p.xz+below*vec2(.389,-.267);
+        // Refraction by different wave slopes spreads the shafts slightly. Each
+        // remains a world-space volume, occluded by the same sun shadow map.
+        vec2 slope=vec2(sin(surface.y*.12+time_data.x*.17),cos(surface.x*.14-time_data.x*.13));
+        vec2 s=surface+slope*(.30+below*.035);
+        float bands=.5+.5*sin(s.x*.73+s.y*.19+sin(s.y*.21)*1.5);
+        float broken=.5+.5*sin(s.y*.34-s.x*.15+time_data.x*.08);
+        float b2=bands*bands,b4=b2*b2,b8=b4*b4;
+        float narrow=b8*b8*(.25+.75*broken*broken*broken);
+        float w=.5+.5*sin(s.x*.31+s.y*.11+1.7);
+        float w2=w*w,w4=w2*w2;
+        float wide=w4*w4*w2;
+        vec2 patch=(s-vec2(18,-38))/vec2(65,85);
+        float aperture=(narrow*.95+wide*.22)*exp(-dot(patch,patch));
         float water=smoothstep(-6.0,-3.5,p.y)*(1.0-smoothstep(49.0,51.0,p.y));
         scatter+=(.025+aperture)*sunVisible(p)*water*exp(-d*.027)*stride;
     }
     float forward=.75+pow(max(dot(dir,normalize(vec3(.35,.90,-.24))),0.0),3.0)*1.7;
-    color+=vec3(.48,.68,.76)*scatter*.085*forward;
+    color+=vec3(.54,.65,.68)*scatter*.055*forward;
     if(visual_debug.x>.5 && visual_debug.x<1.5)color=vec3(z/70.0);
     if(visual_debug.x>1.5 && visual_debug.x<2.5)color=vec3(scatter*.12);
     if(visual_debug.x>2.5 && visual_debug.x<3.5)color=vec3(sunVisible(hit));

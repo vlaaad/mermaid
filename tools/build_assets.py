@@ -14,6 +14,8 @@ import struct
 
 import numpy as np
 from PIL import Image
+from water_patterns import caustics as bake_caustics, surface_normals
+from world_geometry import triangles as read_triangles, rotation as rotation_matrix, convex_collider, Support
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "assets/generated"
@@ -164,7 +166,7 @@ class Mesh:
         sampler='scene_texture' if category=='blit' else 'caustics'
         pattern_texture = 'surface_water.png' if category == 'surface' else 'caustics.png'
         texture=f' textures {{ sampler: "{sampler}" texture: "/assets/generated/{pattern_texture}" }}\n'
-        if category!='blit':texture+=' textures { sampler: "stone_detail" texture: "/assets/textures/limestone-v1.png" }\n'
+        if category not in ('blit','surface'):texture+=' textures { sampler: "stone_detail" texture: "/assets/textures/limestone-v1.png" }\n'
         (OUT/f'{name}.model').write_text(f'mesh: "/assets/generated/{name}.glb"\nmaterials {{\n name: "reef"\n material: "/render/{category}.material"\n{texture}}}\n')
         # Visual offset keeps the physical swimming/camera anchor unchanged.
         model_offset = 'x:.20 y:-.22 z:0' if name == 'mermaid' else 'x:0 y:0 z:0'
@@ -466,52 +468,49 @@ def mermaid():
     centers=[vec(p)+root_shift*max(0,(i-4)/3) for i,p in enumerate(centers)]
     radii=[(.355,.25),(.405,.275),(.385,.265),(.315,.225),(.245,.18),(.165,.125),(.10,.08),(.07,.055)]
     m.tube(centers,radii,(.045,.57,.52,.25),40)
-    # Two swept, pointed lobes. Curved outlines replace straight triangular fans.
+    m.tube([centers[-1],fin_root+vec((0,-.18,.025)),fin_root+vec((0,-.38,.06))],
+           [.065,.043,.009],(.055,.57,.53,.25),16)
+    # Two continuous, cupped blades. A radial grid follows the fin rays without
+    # skinny ear-clipped triangles; paired skins close into a thin 3D membrane.
     def bez(points,t):
         a,b,c,d=[vec(p) for p in points]
         return (1-t)**3*a+3*(1-t)**2*t*b+3*(1-t)*t*t*c+t**3*d
-    # Broad swept blades with a pointed tip and shared central notch.
-    # Control points are authored in local 3D; no runtime camera fitting.
-    fin_outlines=[[(-0.2029609, -0.5339884, 0.0), (-0.3500026, -0.8167358, 0.0), (-1.0727819, -0.9370315, 0.0), (-1.1831819, -1.4896789, 0.0), (-1.4683785, -0.9622137, 0.0), (-0.9074737, -0.2468607, 0.0), (-0.0, -0.0, 0.0)], [(-0.2029609, -0.5339884, 0.0), (-0.4006291, -1.0588396, 0.0), (0.4596894, -0.9368352, 0.0), (0.030918, -1.3849056, 0.0), (0.9043836, -0.8096483, 0.0), (0.6855373, 0.028877, 0.0), (-0.0, -0.0, 0.0)]]
-    for side,outline in zip([-1,1],fin_outlines):
-        # Ear clipping respects the deep trailing-edge notch; a root fan overlaps
-        # this concave blade and produces self-shadowing triangles.
-        boundary=[vec(fin_root)+bez(outline[:4],i/28) for i in range(28)]
-        boundary += [vec(fin_root)+bez(outline[3:],i/28) for i in range(29)]
-        def cross2(a,b,c):
-            x,y=b[:2]-a[:2];u,v=c[:2]-a[:2]
-            return x*v-y*u
-        area=sum(a[0]*b[1]-b[0]*a[1] for a,b in zip(boundary,boundary[1:]+boundary[:1]))
-        if area<0:boundary.reverse()
-        remaining=list(range(len(boundary)));triangles=[]
-        while len(remaining)>3:
-            for j,index in enumerate(remaining):
-                before,after=remaining[j-1],remaining[(j+1)%len(remaining)]
-                a,b,c=[boundary[k] for k in [before,index,after]]
-                if cross2(a,b,c)<=1e-10:continue
-                if any(cross2(a,b,boundary[k])>=-1e-10 and cross2(b,c,boundary[k])>=-1e-10 and cross2(c,a,boundary[k])>=-1e-10 for k in remaining if k not in [before,index,after]):continue
-                triangles.append((a,b,c));remaining.pop(j);break
-            else:raise ValueError('Fin outline cannot be triangulated')
-        triangles.append(tuple(boundary[k] for k in remaining))
-        def surface(p):
-            p=p.copy();x,y=p[:2]-fin_root[:2]
-            p[2]+=.075*math.sin(x*1.6)*math.sin(-y*1.8)
-            dzdx=.12*math.cos(x*1.6)*math.sin(-y*1.8)
-            dzdy=-.135*math.sin(x*1.6)*math.cos(-y*1.8)
-            n=vec((-dzdx,-dzdy,1));n/=np.linalg.norm(n)
-            v=min(1.0,math.hypot(x,y)/1.45)
-            u=math.atan2(x,-y)/math.pi+.5
-            return p,n,(u,v),(.18+.45*v,.38+.38*v,.65+.07*v,.5)
-        def emit(a,b,c,depth):
-            if depth:
-                ab=(a+b)*.5;bc=(b+c)*.5;ca=(c+a)*.5
-                for tri in [(a,ab,ca),(ab,b,bc),(ca,bc,c),(ab,bc,ca)]:emit(*tri,depth-1)
-                return
-            points=[surface(p) for p in [a,b,c]];start=len(m.p)
-            m.tri(*(q[0] for q in points),points[0][3],uv=[q[2] for q in points],normals=[q[1] for q in points])
-            if len(m.p)==start+3:
-                for j,q in enumerate(points):m.c[start+j]=q[3]
-        for tri in triangles:emit(*tri,2)
+    for side in [-1,1]:
+        def blade(u,v):
+            if u<=.5:
+                rim=bez([(0,-.60,0),(side*.25,-.92,0),(side*.86,-.87,0),(side*1.17,-1.53,0)],u*2)
+            else:
+                rim=bez([(side*1.17,-1.53,0),(side*1.38,-.66,0),(side*.75,-.025,0),(0,0,0)],(u-.5)*2)
+            p=rim*v
+            p[2]=.38*math.sin(math.pi*v*.85)*math.sin(math.pi*u)+.17*p[0]**2
+            p[2]+=.08*side*p[0]*v
+            return p+fin_root
+        def vertex(u,v,layer):
+            p=blade(u,v);eps=.0002
+            du=blade(min(1,u+eps),v)-blade(max(0,u-eps),v)
+            dv=blade(u,min(1,v+eps))-blade(u,max(0,v-eps))
+            n=np.cross(du,dv)
+            if np.linalg.norm(n)<1e-8:n=vec((0,0,1))
+            else:n/=np.linalg.norm(n)
+            if n[2]<0:n=-n
+            thickness=.018*math.sin(math.pi*u)*math.sin(math.pi*v)
+            p+=n*thickness*layer
+            color=(.14+.39*v,.43+.28*v,.58+.09*v,.5)
+            return p,n*layer,(u,v),color
+        rows,columns=18,40
+        for layer in [-1,1]:
+            grid=[[vertex(j/columns,i/rows,layer) for j in range(columns+1)] for i in range(rows+1)]
+            for i in range(rows):
+                for j in range(columns):
+                    corners=[grid[i][j],grid[i+1][j],grid[i+1][j+1],grid[i][j+1]]
+                    for ids in ([0,1,2],[0,2,3]):
+                        points=[corners[k] for k in ids]
+                        face=np.cross(points[1][0]-points[0][0],points[2][0]-points[0][0])
+                        if np.dot(face,points[0][1])<0:points.reverse()
+                        start=len(m.p)
+                        m.tri(*(q[0] for q in points),points[0][3],uv=[q[2] for q in points],normals=[q[1] for q in points])
+                        if len(m.p)==start+3:
+                            for k,q in enumerate(points):m.c[start+k]=q[3]
     # Hair hugs the whole rear scalp, then separates into broad wavy locks.
     hair=(.84,.66,.36)
     scalp_start=len(m.p)
@@ -641,28 +640,8 @@ def main():
     fullscreen.quad((-1,-1,0),(1,-1,0),(1,1,0),(-1,1,0),(1,1,1))
     fullscreen.save('fullscreen','blit')
 
-    # Receiver pattern only: curve cell boundaries by a seamless wave field.
-    # Preserve the old intensity distribution and the surface's entire texture,
-    # so this fitting pass does not retune brightness or change water appearance.
-    rng=np.random.default_rng(73)
-    yy,xx=np.mgrid[0:256,0:256]/256*7
-    sites=[(i+rng.random(),j+rng.random()) for i in range(7) for j in range(7)]
-    def receiver_pattern(x,y):
-        nearest=np.full((256,256),1e6);second=nearest.copy()
-        for px,py in sites:
-            dx=np.abs(x-px);dx=np.minimum(dx,7-dx)
-            dy=np.abs(y-py);dy=np.minimum(dy,7-dy)
-            d=dx*dx+dy*dy
-            second=np.minimum(second,np.maximum(nearest,d));nearest=np.minimum(nearest,d)
-        return np.exp(-(np.sqrt(second)-np.sqrt(nearest))*29)
-    surface_pattern=receiver_pattern(xx,yy)
-    u,v=xx/7,yy/7
-    wave_x=.38*np.sin(math.tau*(2*u+v)+.8)+.18*np.sin(math.tau*(3*v-u)+1.6)
-    wave_y=.34*np.sin(math.tau*(u-2*v)-.6)+.14*np.sin(math.tau*(3*u+v)+2.3)
-    curved=receiver_pattern((xx+wave_x)%7,(yy+wave_y)%7)
-    intensity=np.empty_like(curved)
-    intensity.ravel()[np.argsort(curved.ravel())]=np.sort(surface_pattern.ravel())
-    from PIL import ImageFilter
+    # Refractive folds from a ray field replace curved Voronoi cell borders.
+    intensity=bake_caustics()
     stone_rng=np.random.default_rng(841)
     def periodic_noise(power,stretch=1):
         field=stone_rng.normal(size=(256,256))
@@ -679,10 +658,20 @@ def main():
     band=np.exp(-(frequency/.028)**2)*(1-np.exp(-(frequency/.006)**2))
     water=np.fft.ifft2(np.fft.fft2(field)*band).real
     low,high=np.percentile(water,[1,99]);water=np.clip((water-low)/(high-low),0,1)
-    Image.fromarray(np.uint8(np.clip(np.stack([intensity,stone,water],axis=-1),0,1)*255)).save(OUT/'caustics.png')
-    Image.fromarray(np.uint8(np.clip(np.stack([surface_pattern,stone,water],axis=-1),0,1)*255)).save(OUT/'surface_water.png')
+    def enlarged(field):
+        return np.asarray(Image.fromarray(np.uint8(field*255)).resize((512,512),Image.Resampling.BICUBIC))/255
+    Image.fromarray(np.uint8(np.clip(np.stack([intensity,enlarged(stone),enlarged(water)],axis=-1),0,1)*255)).save(OUT/'caustics.png')
+    Image.fromarray(surface_normals()).save(OUT/'surface_water.png')
 
-    objects=[]; obstacles=[]
+    # Queries use the final exported stone, including its authored bevels.
+    finish_character()
+    finish_ruins()
+    finish_foreground_stone()
+    stone_names=[*(f'rock{i}' for i in range(4)),'rock3_detail','seabed','column','arch','ring','gateway_facade']
+    stone_meshes={name:read_triangles(OUT/f'{name}.glb') for name in stone_names}
+    objects=[]; obstacles=[]; placed=[]; support_triangles=[]
+    def instance(name,asset,p,q,scale):
+        return f'instances {{ id: "{name}" prototype: "/assets/generated/{asset}.go" position {{x:{p[0]} y:{p[1]} z:{p[2]}}} rotation {{x:{q[0]} y:{q[1]} z:{q[2]} w:{q[3]}}} scale3 {{x:{scale[0]} y:{scale[1]} z:{scale[2]}}} }}'
     placements=0
     def place(asset,p,scale=(1,1,1),yaw=0,collision=False,pitch=0,roll=0,label=None,depth_scale=1):
         nonlocal placements
@@ -700,12 +689,16 @@ def main():
             ax,ay,az,aw=a;bx,by,bz,bw=b
             return (aw*bx+ax*bw+ay*bz-az*by,aw*by-ax*bz+ay*bw+az*bx,aw*bz+ax*by-ay*bx+az*bw,aw*bw-ax*bx-ay*by-az*bz)
         q=multiply(multiply((0,math.sin(yaw/2),0,math.cos(yaw/2)),(math.sin(pitch/2),0,0,math.cos(pitch/2))),(0,0,math.sin(roll/2),math.cos(roll/2)))
-        objects.append(f'instances {{ id: "{name}" prototype: "/assets/generated/{asset}.go" position {{x:{p[0]} y:{p[1]} z:{p[2]}}} rotation {{x:{q[0]} y:{q[1]} z:{q[2]} w:{q[3]}}} scale3 {{x:{scale[0]} y:{scale[1]} z:{scale[2]}}} }}')
-        if collision:
-            qx,qy,qz,qw=q
-            rotation=np.array([[1-2*(qy*qy+qz*qz),2*(qx*qy-qz*qw),2*(qx*qz+qy*qw)],[2*(qx*qy+qz*qw),1-2*(qx*qx+qz*qz),2*(qy*qz-qx*qw)],[2*(qx*qz-qy*qw),2*(qy*qz+qx*qw),1-2*(qx*qx+qy*qy)]])
-            extent=abs(rotation)@vec((scale[0]*.88,scale[1]*.48,scale[2]*.88))
-            obstacles.append([round(float(v),3) for v in [*p,*extent]])
+        placed.append(dict(name=name,asset=asset,p=vec(p),q=q,scale=scale,index=len(objects)))
+        objects.append(instance(name,asset,p,q,scale))
+        if asset in stone_meshes:
+            world=(stone_meshes[asset]*vec(scale))@rotation_matrix(q).T+vec(p)
+            support_triangles.append(world)
+            if asset.startswith('rock'):
+                # Every rock, including lintels and the detailed foreground block,
+                # gets its actual transformed hull instead of a smaller guessed box.
+                hull=world if asset!='rock3_detail' else (stone_meshes['rock3']*vec(scale))@rotation_matrix(q).T+vec(p)
+                obstacles.append(convex_collider(hull))
         if asset=='column':
             obstacles.append([p[0],p[1]+4.2*scale[1],p[2],.76*scale[0],4.2*scale[1],.76*scale[2]])
         elif asset in ('arch','gateway_facade'):
@@ -916,13 +909,40 @@ def main():
     # Remove only obsolete outputs from the abandoned mesh-baking experiment.
     for stale in list(OUT.glob('ruins_chunk_*')) + [OUT/(n+ext) for n in ('fish_field','fish_blue_field','dust_field') for ext in ('.glb','.model','.go')]:
         if stale.suffix in ('.glb','.model','.go') and stale.exists():stale.unlink()
+    # Seat all rooted actors after the complete world exists. A shared mesh stays
+    # shared; only the instance anchor changes. Bury roots slightly in the stone.
+    support=Support(np.concatenate(support_triangles))
+    plant_roots={}
+    planting=[]
+    for actor in placed:
+        asset=actor['asset']
+        if asset not in ('kelp','ribbon_kelp','sponge','coral_pink','coral_blue','coral_gold'):continue
+        p=actor['p'];scale=actor['scale'];original=p.copy()
+        if asset not in plant_roots:
+            vertices=read_triangles(OUT/f'{asset}.glb').reshape(-1,3)
+            plant_roots[asset]=np.unique(np.round(vertices[vertices[:,1]<.025],5),axis=0)
+        offsets=(plant_roots[asset]*vec(scale))@rotation_matrix(actor['q']).T
+        best=None
+        candidates=[(0,0)]+[(dx,dz) for radius in [.6,1.2,1.8] for dx,dz in [(-radius,0),(radius,0),(0,-radius),(0,radius),(-radius,-radius),(radius,radius),(-radius,radius),(radius,-radius)]]
+        for dx,dz in candidates:
+            candidate=p+vec((dx*scale[0],0,dz*scale[2]))
+            roots=[]
+            for offset in offsets:
+                h=support.height(candidate[0]+offset[0],candidate[2]+offset[2],p[1])
+                if h is not None:roots.append(h-offset[1])
+            if len(roots)!=len(offsets):continue
+            spread=max(roots)-min(roots)
+            score=abs(min(roots)-p[1])*.25+spread*4+math.hypot(dx,dz)*.30
+            if best is None or score<best[0]:best=(score,candidate,min(roots))
+            if spread<.12*scale[1]:break
+        if best is None:raise ValueError(f'No support for {actor["name"]}')
+        _,p,h=best;p[1]=h-.10*min(scale[1],1.5)
+        objects[actor['index']]=instance(actor['name'],asset,p,actor['q'],scale)
+        planting.append(dict(id=actor['name'],asset=asset,original=original.tolist(),position=p.tolist(),support_height=h,root_gap=float(p[1]-h)))
+    (ROOT/'assets/source/plant-support.json').write_text(json.dumps(planting,indent=2)+'\n')
     (ROOT/'assets/source/landmarks.json').write_text(json.dumps(landmark_records,indent=2)+'\n')
     (ROOT/'main/world.collection').write_text('name: "world"\n'+ '\n'.join(objects)+'\n')
-    (ROOT/'main/obstacles.lua').write_text('return '+json.dumps([[float(v) for v in box] for box in obstacles],separators=(',',':')).replace('[','{').replace(']','}')+'\n')
-    finish_character()
-    finish_ruins()
-    # Detailed stone only for the foreground block; terrace meshes stay light.
-    finish_foreground_stone()
+    (ROOT/'main/obstacles.lua').write_text('return '+json.dumps(obstacles,separators=(',',':')).replace('[','{').replace(']','}')+'\n')
     STATS['world']={"instances":len(objects),"source_placements":placements,"collision_boxes":len(obstacles),"seed":73}
     (OUT/'manifest.json').write_text(json.dumps(STATS,indent=2)+'\n')
     print(json.dumps(STATS,indent=2))

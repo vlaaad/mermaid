@@ -3,5 +3,4 @@ materials {
  name: "reef"
  material: "/render/surface.material"
  textures { sampler: "caustics" texture: "/assets/generated/surface_water.png" }
- textures { sampler: "stone_detail" texture: "/assets/textures/limestone-v1.png" }
 }

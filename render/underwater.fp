@@ -17,11 +17,20 @@ uniform fs_uniforms {
     highp vec4 camera_pos;
     highp mat4 light_matrix;
 };
-// One-variable fitting pass: caustic contribution only.
-const float CAUSTIC_GAIN=.90;
+const float CAUSTIC_GAIN=.68;
 const float STONE_CAUSTIC_RESPONSE=.35;
 const vec3 ROCK_AMBIENT_GAIN=vec3(1.8,1.4,1.15);
 const vec3 ROCK_SUN_GAIN=vec3(.05,.20,.25);
+// Interpolate comparisons, not depth: continuous PCF without a larger shadow map.
+float filteredShadow(vec2 uv,float receiver,vec2 slope) {
+    vec2 pixel=uv*1024.0-.5,base=floor(pixel),f=fract(pixel);
+    vec2 tap=(base+.5)/1024.0;
+    float a=step(receiver+dot(slope,tap-uv),texture(sun_depth,tap).r);
+    float b=step(receiver+dot(slope,tap+vec2(1,0)/1024.0-uv),texture(sun_depth,tap+vec2(1,0)/1024.0).r);
+    float c=step(receiver+dot(slope,tap+vec2(0,1)/1024.0-uv),texture(sun_depth,tap+vec2(0,1)/1024.0).r);
+    float d=step(receiver+dot(slope,tap+vec2(1,1)/1024.0-uv),texture(sun_depth,tap+vec2(1,1)/1024.0).r);
+    return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);
+}
 float visibility(vec3 p,vec3 normal,float ndl) {
     if(abs(light_matrix[3].w)<.0001)return 1.0;
     vec4 light=light_matrix*vec4(p+normal*.025,1.0);
@@ -32,50 +41,10 @@ float visibility(vec3 p,vec3 normal,float ndl) {
     slope=clamp(slope,vec2(-1.0),vec2(1.0));
     if(q.x<.002 || q.y<.002 || q.x>.998 || q.y>.998 || q.z>1.0 || q.z<0.0)return 1.0;
     float bias=.00015+.00012*(1.0-ndl);
-    float blocker=texture(sun_depth,q.xy).r;
-    float radius=clamp(1.5+max(q.z-blocker,0.0)*150.0*.12*1024.0/100.0,1.5,7.0);
-    float sum=0.0;
-    for(int i=0;i<4;i++) {
-        float angle=float(i)*2.399963;
-        vec2 offset=vec2(cos(angle),sin(angle))*sqrt((float(i)+.5)/4.0)*radius/1024.0;
-        vec2 tap=(floor((q.xy+offset)*1024.0)+.5)/1024.0;
-        float receiver=q.z+dot(slope,tap-q.xy)-bias;
-        sum+=step(receiver,texture(sun_depth,tap).r);
-    }
-    return sum/4.0;
+    return filteredShadow(q.xy,q.z-bias,slope);
 }
 
-vec3 surfaceColor(float t) {
-    vec3 shaded;
-    // Underside of a distant wave field: sloping wave facets refract skylight.
-    // Layered directional waves replace the obvious tiled caustic ceiling.
-    vec2 p=var_world.xz;
-    vec2 uv1=p*.005+vec2(t*.0015,-t*.001);
-    vec2 uv2=mat2(.80,-.60,.60,.80)*p*.013+vec2(-t*.001,t*.0018);
-    float h1=texture(caustics,uv1).b;
-    float h2=texture(caustics,uv2).b;
-    vec2 warp=vec2(h1,h2)-.5;
-    vec2 fineUV=mat2(.94,-.342,.342,.94)*p*.070+warp*.31+vec2(t*.001,-t*.002);
-    float facets=texture(caustics,fineUV).b;
-    float ridge=texture(caustics,p*.0425+warp*.23+vec2(-t*.002,0)).r;
-    float clarity=1.0-smoothstep(90.0,180.0,var_depth);
-    facets=mix(.5,facets,clarity*.10);
-    ridge*=clarity*.70;
-    vec2 e=vec2(1.0/256.0,0.0);
-    vec2 slope=vec2(texture(caustics,fineUV+e.xy).b-texture(caustics,fineUV-e.xy).b,
-                    texture(caustics,fineUV+e.yx).b-texture(caustics,fineUV-e.yx).b)*1.7;
-    vec3 waterNormal=normalize(vec3(slope.x,-1.0,slope.y));
-    vec3 view=normalize(camera_pos.xyz-var_world);
-    float facing=max(dot(waterNormal,view),0.0);
-    float fresnel=.02+.98*pow(1.0-facing,5.0);
-    vec3 transmitted=mix(vec3(.065,.55,.89),vec3(.25,.76,.95),smoothstep(.17,.81,facets));
-    transmitted+=vec3(.04,.07,.08)*ridge;
-    vec3 reflected=mix(vec3(.025,.40,.77),vec3(.12,.65,.95),facets);
-    shaded=mix(transmitted,reflected,fresnel*.6);
-    float glow=exp(-dot((p-vec2(48.0,-80.0))/vec2(55.0,60.0),(p-vec2(48.0,-80.0))/vec2(55.0,60.0)));
-    shaded+=vec3(.2976,.4176,.3036)*glow;
-    return shaded*vec3(.50,.77,.98);
-}
+
 vec3 fogged(vec3 shaded,float density,bool surface) {
     // Suspended sediment makes water near the basin floor more turbid.
     // This follows world height in every camera view, including orbit/swimming.
@@ -94,14 +63,10 @@ void main() {
         out_fragColor=vec4(vec3(architecture),1.0);
         return;
     }
-    // Surface pixels do not need stone textures, caustic receivers or eight PCF taps.
-    if(params.x>3.5 && params.x<4.5) {
-        out_fragColor=vec4(fogged(surfaceColor(time_data.x),fog_settings.w*.22,true),1.0);
-        return;
-    }
     vec3 n=normalize(var_normal);
     vec3 geometric=n;
     if(!gl_FrontFacing && params.x>.5 && params.x<1.5)n=-n;
+    if(!gl_FrontFacing && params.x>2.5 && params.x<3.5 && var_color.a>.37 && var_color.a<.62)n=-n;
     vec3 sun=normalize(vec3(.35,.90,-.24));
     float diffuse=max(dot(n,sun),0.0);
     // Bias a thin fin toward the light on either side to avoid self-shadow acne.
@@ -113,7 +78,7 @@ void main() {
     uv+=vec2(sin(var_world.z*.16+t*.35),cos(var_world.x*.13+t*.29))*.022;
     float c1=texture(caustics,uv+vec2(t*.006,t*.004)).r;
     float c2=texture(caustics,uv*1.31+vec2(-t*.004,t*.007)).r;
-    float pattern=pow(c1,.65)*.70+pow(c2,.65)*.45;
+    float pattern=c1*.85+c2*.30;
     float sky=n.y*.5+.5;
     vec3 ambient=mix(vec3(.13,.25,.34),vec3(.40,.59,.68),sky);
     // Broad bounced sand light gives undersides a cool green fill.
@@ -170,13 +135,15 @@ void main() {
         shaded+=vec3(.35,.42,.32)*spec*.18;
         shaded+=vec3(.18,.37,.32)*pattern*.13*shadow;
         if(var_color.a>.37 && var_color.a<.62) {
-            float phase=var_uv.x*44.0;
+            float phase=var_uv.x*26.0;
             float distanceToVein=abs(fract(phase+.5)-.5);
             float width=max(fwidth(phase),.025);
             float vein=(1.0-smoothstep(.025,.025+width,distanceToVein))*smoothstep(.02,.12,var_uv.y);
             shaded=mix(shaded,shaded*vec3(.65,.95,1.20)+vec3(.025,.07,.10),vein*.65);
             shaded+=base*vec3(.10,.08,.03);
-            shaded*=vec3(1.99,1.86,1.30); // Pale yellow-green transmitted light through the fin.
+            float transmitted=.45+.55*abs(dot(n,sun));
+            shaded+=base*vec3(.15,.18,.10)*transmitted;
+            shaded*=vec3(1.12,1.20,1.10);
         }
         if(var_color.a>.62 && var_color.a<.87) {
             float grooves=.96+.04*sin(var_uv.x*90.0);

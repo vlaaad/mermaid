@@ -18,6 +18,7 @@ uniform vs_uniforms {
 };
 void main() {
     vec3 p = position.xyz;
+    vec3 localNormal=normal;
     float t = time_data.x;
     vec3 origin = mtx_world[3].xyz;
     if (params.x > 0.5 && params.x < 1.5) {
@@ -32,6 +33,15 @@ void main() {
         float beat = 1.7 + time_data.y * 0.18;
         p.x += sin(t * beat + p.y * 1.45) * tail * (0.13 + time_data.y * 0.018);
         p.z += cos(t * beat + p.y * 1.45) * tail * 0.10;
+        if(color.a>.37 && color.a<.62) {
+            float span=p.x+.18288788;
+            float flex=smoothstep(0.0,1.2,abs(span));
+            float phase=t*beat-abs(span)*3.2;
+            p.z+=sin(phase)*flex*.18;
+            float derivative=cos(phase)*(-sign(span)*3.2)*flex*.18;
+            derivative+=sin(phase)*sign(span)*6.0*clamp(abs(span)/1.2,0.0,1.0)*(1.0-clamp(abs(span)/1.2,0.0,1.0))*.15;
+            localNormal.x-=derivative*localNormal.z;
+        }
         float hair = smoothstep(0.1, 0.6, p.z) * smoothstep(0.5, 1.0, p.y);
         p.x += sin(t * 1.3 + p.y * 5.0 + p.z * 3.0) * hair * 0.065;
     } else if (params.x > 5.5 && params.x < 6.5) {
@@ -51,7 +61,7 @@ void main() {
         world.z+=cos(t*.23+origin.x)*.45;
     }
     vec3 scale2 = vec3(dot(mtx_world[0].xyz,mtx_world[0].xyz),dot(mtx_world[1].xyz,mtx_world[1].xyz),dot(mtx_world[2].xyz,mtx_world[2].xyz));
-    var_normal = normalize(mat3(mtx_world) * (normal / max(scale2, vec3(0.0001))));
+    var_normal = normalize(mat3(mtx_world) * (localNormal / max(scale2, vec3(0.0001))));
     var_world = world.xyz;
     var_color = color;
     var_uv = texcoord0;

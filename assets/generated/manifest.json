@@ -115,8 +115,8 @@
     "bytes": 131364
   },
   "mermaid": {
-    "triangles": 46360,
-    "bytes": 2500496,
+    "triangles": 50224,
+    "bytes": 2612280,
     "source": "assets/source/mermaid.blend"
   },
   "seabed": {
@@ -146,7 +146,7 @@
   "world": {
     "instances": 1713,
     "source_placements": 1723,
-    "collision_boxes": 1217,
+    "collision_boxes": 1218,
     "seed": 73
   }
 }

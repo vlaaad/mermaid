@@ -4,11 +4,15 @@
 
 Build an interactive 3D scene matching `Blonde-Mermaid-in-Atlantis-Ruins.png`, with satisfying keyboard/mouse swimming on desktop and browser. Target hardware: Intel HD530 laptop; aim for 30 FPS.
 
-**Target reached: 20% of pixels within 10 RGB levels per channel. Latest measured: 20.16% (pass112).** Exact matches: 0.0199%; RGB MAE: 9.4601%; SSIM: 0.48273. These are diagnostics, not overall fidelity percentages. Evidence: `artifacts/progress/pass112/`.
+**Historical opening fit before the close-detail pass: 20.16% of pixels within 10 RGB levels per channel (pass112).** Exact matches: 0.0199%; RGB MAE: 9.4601%; SSIM: 0.48273. These are diagnostics, not overall fidelity percentages. Evidence: `artifacts/progress/pass112/`.
 
-Retained work: broader pointed fins with clean concave topology, filtered veins and pale green transmitted light; larger head/scalp; lower arms and flowing locks; rotated connected arcade, deeper column fluting, all 11 required column regions present; muted green grass with three corrected roots; blue rock/floor materials with softer sand caustics, height-based bottom-water haze, stronger surface sunlight patch with softer wave facets, foreground stone volume with local bevel detail. Native pass87: 24.0ms mean / 24.5ms p95, 78 draws. Previous slow profiles overlapped CPU-heavy fitting; do not attribute them solely to rock bevels.
+The close-detail pass replaces the flat fin with a cupped, closed membrane, shared radial topology, corrected normals and independent blade flex. Sand caustics now come from an offline refracted wave ray field. Shadows bilinearly interpolate four depth comparisons with the existing 1024² map, removing the old four-level snapped PCF without increasing the map size or pass count.
 
-Retained layout now includes broader columns and deeper left and right ledge groups, with their plants/collision moved together; the right group exposes the orange school. The right mid-terrace trial (43,-42, height13.5) is retained. Rock material now uses softer direct light and stronger cool ambient fill, verified in pass97 against the same frozen camera/time. Latest validated browser build remains pass53, about 19 FPS; rebuild and validate current web output before reporting browser performance.
+Water has a separate `surface.fp`: two scrolling, rotated wave-normal layers, mipmapping and anisotropic filtering, dielectric Fresnel reflection, a softened Snell window and an antialiased refracted sun. The sun's above-water direction is derived from the direction used by the underwater lighting and shafts. Underwater reflections use a blue scattered-light environment approximation, without reflecting nearby architecture. Quarter-resolution scattering uses midpoint integration to avoid the old fixed pixel-noise grid; shafts vary with surface position and wave slope.
+
+All 1,157 rocks now have geometry-derived convex collision hulls, including lintels and the detailed foreground block. Six overlapping body spheres cover the character, and the camera clips against hull faces. All 273 rooted actors are placed using the final stone geometry and their individual mesh root feet. `tools/check_world.py` verifies collider coverage and root support. No unsupported roots were found. `tools/detail_check.py` captures rear/side/sand/upward views and checks boosted contact with a large boulder. Evidence: `artifacts/close-detail/delivered/` and `artifacts/close-detail/world-audit.json`.
+
+Opening structure checks still find all 11 required regions. The new lighting changes the old pixel-fit score; use the current captures rather than treating pass112 as the current rendered result. The final WebGL build measures about 20–22 FPS at 1280×720 on this HD530, comparable to the isolated starting build at about 21 FPS on the same machine. This remains below the 30 FPS target. Evidence: `artifacts/close-detail/browser-before/`, `browser-after/` and `browser-water-metrics.json`. Browser swimming and upward orbit pass, with no WebGL warnings/errors.
 
 ## Produce a diff
 
@@ -41,13 +45,14 @@ The comparison uses fixed 960px analysis width and LANCZOS resizing, with no ali
 - Keep real 3D geometry and independent shared-mesh actors. No reference backdrops, projections or actor baking. Inspect swimming and orbit views too.
 - Main remaining mismatches: foreground/midground rock shape and placement, vegetation, character and architecture. Do not count blue water as missing blue geometry.
 - All 11 architecture regions pass as of pass79. The coarse audit checks presence, not silhouette accuracy; inspect the normal capture too.
-- Unsupported coral `(-9,9,-20)` and sponge `(-11,4.5,-11)` remain. Three prominent grass roots were seated on measured ledges. Raycast support before moving plants; helper: `artifacts/progress/check_support.py` (extend its mesh filter for `rock3_detail` if querying the new block).
+- Regeneration seats rooted actors against the complete final stone geometry. Run `tools/check_world.py` after moving geometry or plants; it checks every exported root foot, including stems around the edges of clusters.
 - Preserve existing work. Commit each verified improvement that is retained. Historical experiments and measurements remain in `artifacts/progress/`.
 
 ## Build assets and validate
 
 ```bash
-python3 tools/build_assets.py
+OPENBLAS_NUM_THREADS=1 python3 tools/build_assets.py
+python3 tools/check_world.py
 python3 -m unittest tools.test_image_diff tools.test_structure_check -q
 python3 tools/playtest.py
 ```
@@ -58,7 +63,7 @@ Finished meshes are cached by raw-mesh/script signature. Manual edits must expor
 
 Mermaid vertex alpha identifies skin 0, tail .25, fluke .5, hair .75, garment 1. Normal fragment output stays opaque. Swimming, hair and tail deformation currently use the vertex shader. Controls: WASD, Space/E rise, Ctrl/Q dive, Shift boost, mouse drag orbit, R reset, P profiler.
 
-`playtest.py` checks frozen stability, swimming, boost, rise, orbit and native profiling. Last complete movement/browser validation: pass53. Latest native frozen profile: pass87, 24.0ms mean, 78 draws. Revalidate current changes separately on native and web.
+`playtest.py` passes frozen stability, forward swimming, boost (1.95× normal distance), rise and orbit after this pass. `detail_check.py` passes boosted boulder contact. All 16 existing image/structure tests pass. WebGL builds without errors or warnings. Final native frozen profiling measured 40.3ms mean / 90.6ms p95, 79 draws, compared with 47.5ms / 96.1ms for the starting build in this session. Timings remain variable and the 30 FPS target is not yet met on this hardware. See `artifacts/close-detail/delivered/profile.json` and browser evidence in `artifacts/close-detail/browser-after/` rather than reusing the historical pass87 24ms result.
 
 ## Runtime and tooling
 
@@ -72,6 +77,12 @@ Mermaid vertex alpha identifies skin 0, tail .25, fluke .5, hair .75, garment 1.
 
 Opaque depth-tested rendering; no depth prepass or alpha discard. Keep fish, fins, hair and kelp two-sided. Sampled depth attachments require `render.TEXTURE_BIT`; fullscreen glTF UVs need V restored at each render-target lookup.
 
-Geometry/post cap: 1280×720; 1024² shadow map with 4 PCF taps; quarter-resolution 32-step water scattering; depth-aware upsampling. Shared GLBs index complete vertex tuples to preserve seams and normals. Collision substeps ≤25ms and dt cap .1 prevent slow motion under load.
+Geometry/post cap: 1280×720; 1024² shadow map with four bilinearly interpolated depth comparisons; quarter-resolution 24-step water scattering; depth-aware upsampling. Shared GLBs index complete vertex tuples to preserve seams and normals. Collision substeps ≤25ms and dt cap .1 prevent slow motion under load.
 
 Rejected experiments: hand-extruded cliffs (passes21–22), cutout hair/tail/plants (`7e66368`, reverted), connected outcrop (passes50–51, reverted: worse visuals and 92 draws), `SORT_NONE` (pass52: 97 draws). Do not restore blindly.
+
+## Water rendering references
+
+- [GPU Gems: Effective Water Simulation from Physical Models](https://developer.nvidia.com/gpugems/gpugems/part-i-natural-effects/chapter-1-effective-water-simulation-physical-models): layered directional wave normals.
+- [Monzon et al., Real-Time Underwater Spectral Rendering (2024)](https://onlinelibrary.wiley.com/doi/10.1111/cgf.15009): dielectric water surface, Fresnel reflection and Snell's window. This project implements an RGB approximation, not the paper's full spectral transport model.
+- [Defold material filtering](https://defold.com/manuals/material/): trilinear mip filtering and anisotropy for grazing surface views.

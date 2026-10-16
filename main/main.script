@@ -1,4 +1,5 @@
 local obstacles = require "main.obstacles"
+local collision = require "main.collision"
 local function clamp(v,a,b) return math.max(a,math.min(b,v)) end
 local function smooth(rate,dt) return 1-math.exp(-rate*dt) end
 local function wrap(a) return (a+math.pi)%(math.pi*2)-math.pi end
@@ -19,38 +20,7 @@ local function reset(self,freeze)
     self.tilt=-.45
     self.dragging=false
     self.camera_cache=nil
-end
-
-local function resolve(position)
-    local radius=.47
-    for _=1,2 do
-        for _,b in ipairs(obstacles) do
-            if math.abs(position.x-b[1])<b[4]+radius and math.abs(position.y-b[2])<b[5]+radius and math.abs(position.z-b[3])<b[6]+radius then
-            local dx=position.x-clamp(position.x,b[1]-b[4],b[1]+b[4])
-            local dy=position.y-clamp(position.y,b[2]-b[5],b[2]+b[5])
-            local dz=position.z-clamp(position.z,b[3]-b[6],b[3]+b[6])
-            local d2=dx*dx+dy*dy+dz*dz
-            if d2<radius*radius then
-                if d2>.000001 then
-                    local d=math.sqrt(d2)
-                    local push=(radius-d)/d
-                    position=position+vmath.vector3(dx*push,dy*push,dz*push)
-                else
-                    local px=b[4]+radius-math.abs(position.x-b[1])
-                    local py=b[5]+radius-math.abs(position.y-b[2])
-                    local pz=b[6]+radius-math.abs(position.z-b[3])
-                    if px<py and px<pz then position.x=position.x+(position.x>b[1] and px or -px)
-                    elseif py<pz then position.y=position.y+(position.y>b[2] and py or -py)
-                    else position.z=position.z+(position.z>b[3] and pz or -pz) end
-                end
-            end
-            end
-        end
-    end
-    position.x=clamp(position.x,-52,58)
-    position.y=clamp(position.y,-1.5,36)
-    position.z=clamp(position.z,-124,9)
-    return position
+    self.inspect_camera=nil
 end
 
 local function camera_obstruction(anchor,arm,b)
@@ -66,6 +36,17 @@ local function camera_obstruction(anchor,arm,b)
     if not slab(anchor.x,arm.x,b[1],b[4]+.25) then return nil end
     if not slab(anchor.y,arm.y,b[2],b[5]+.25) then return nil end
     if not slab(anchor.z,arm.z,b[3],b[6]+.25) then return nil end
+    if b[7] then
+        for _,plane in ipairs(b[7]) do
+            local distance=anchor.x*plane[1]+anchor.y*plane[2]+anchor.z*plane[3]-plane[4]-.25
+            local direction=arm.x*plane[1]+arm.y*plane[2]+arm.z*plane[3]
+            if math.abs(direction)<.000001 then
+                if distance>0 then return nil end
+            elseif direction<0 then low=math.max(low,-distance/direction)
+            else high=math.min(high,-distance/direction) end
+            if low>high then return nil end
+        end
+    end
     return low
 end
 
@@ -84,7 +65,13 @@ function init(self)
     end
     if automation_bridge then
         automation_bridge.command("mermaid.reset",function(data) reset(self,data.freeze~=false) return state(self) end)
-        automation_bridge.command("mermaid.capture",function() reset(self,true) return state(self) end)
+        automation_bridge.command("mermaid.capture",function(data)
+            reset(self,true)
+            if data.position then self.position=vmath.vector3(data.position.x,data.position.y,data.position.z) end
+            if data.time then self.time=data.time end
+            if data.camera and data.look then self.inspect_camera=data end
+            return state(self)
+        end)
         automation_bridge.command("mermaid.lighting",function(data) msg.post("@render:","lighting_debug",{mode=tonumber(data.mode) or 0}) return {mode=data.mode or 0} end)
         automation_bridge.command("mermaid.resume",function() self.frozen=false return state(self) end)
         automation_bridge.describe("command","mermaid.capture",{description="Reset opening camera, player pose, seed-dependent scene, and animation time; freeze until input or resume."})
@@ -113,7 +100,9 @@ function update(self,dt)
     self.velocity=vmath.lerp(smooth(input and 4.5 or 3.4,dt),self.velocity,desired*target_speed)
     if vmath.length_sqr(self.velocity)>.0001 then
         local steps=math.max(1,math.ceil(dt/.025))
-        for _=1,steps do self.position=resolve(self.position+self.velocity*(dt/steps)) end
+        local rotation=vmath.quat_rotation_y(self.heading)*vmath.quat_rotation_z(self.bank-.12)*vmath.quat_rotation_x(self.tilt)
+        local body=collision.body(rotation)
+        for _=1,steps do self.position=collision.resolve(self.position+self.velocity*(dt/steps),body) end
     else self.velocity=vmath.vector3() end
     self.speed=vmath.length(self.velocity)
     if input and (forward~=0 or side~=0) then
@@ -152,6 +141,11 @@ function update(self,dt)
     end
     self.camera=self.frozen and desired_camera or vmath.lerp(smooth(5,dt),self.camera,desired_camera)
     local look=self.position+vmath.vector3(.65,1.1,0)+vmath.vector3(-math.sin(self.yaw)*16,math.sin(self.pitch)*16,-math.cos(self.yaw)*16)
+    if self.inspect_camera and self.frozen then
+        local c,l=self.inspect_camera.camera,self.inspect_camera.look
+        self.camera=vmath.vector3(c.x,c.y,c.z)
+        look=vmath.vector3(l.x,l.y,l.z)
+    end
     local view=vmath.matrix4_look_at(self.camera,look,vmath.vector3(0,1,0))
     msg.post("@render:","scene_camera",{view=view,position=vmath.vector4(self.camera.x,self.camera.y,self.camera.z,1),time_data=vmath.vector4(self.time,self.speed,0,0)})
     self.publish_timer=self.publish_timer+dt
