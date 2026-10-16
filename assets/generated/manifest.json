@@ -120,10 +120,10 @@
     "source": "assets/source/mermaid.blend"
   },
   "seabed": {
-    "triangles": 2574,
-    "vertices": 7722,
-    "unindexed_vertices": 7722,
-    "bytes": 402784
+    "triangles": 12782,
+    "vertices": 38346,
+    "unindexed_vertices": 38346,
+    "bytes": 1995244
   },
   "surface": {
     "triangles": 2,
@@ -144,9 +144,9 @@
     "bytes": 1380
   },
   "world": {
-    "instances": 1713,
-    "source_placements": 1723,
-    "collision_boxes": 1218,
+    "instances": 1810,
+    "source_placements": 1820,
+    "collision_boxes": 1281,
     "seed": 73
   }
 }

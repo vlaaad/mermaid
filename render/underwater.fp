@@ -1,4 +1,5 @@
 #version 140
+#include "/render/water_depth.glsl"
 in highp vec3 var_world;
 in mediump vec3 var_normal;
 in mediump vec4 var_color;
@@ -40,7 +41,7 @@ highp float bound(highp vec2 moments,highp float receiver) {
 }
 highp float nearVisibility(highp vec3 q) {
     highp vec4 m=texture(near_shadow,q.xy);
-    highp float z=q.z-.00012;
+    highp float z=q.z-.00006;
     highp float v=min(bound(m.xy,exp(32.0*(z-1.0))),bound(m.zw,-exp(-32.0*z)));
     return clamp((v-.15)/.85,0.0,1.0);
 }
@@ -75,7 +76,8 @@ vec3 fogged(vec3 shaded,float density,bool surface) {
     vec3 fog=mix(vec3(0.061000,0.485000,0.875000),fog_settings.rgb,clamp(ray.y*.9+.42,0.0,1.0));
     fog+=vec3(.012,.035,.04)*pow(max(dot(ray,sun),0.0),5.0);
     if(surface)blend=max(blend,smoothstep(165.0,300.0,var_depth));
-    return mix(shaded,fog,blend);
+    fog*=waterHazeLight(camera_pos.y,ray.y);
+    return mix(shaded*waterDaylight(var_world.y),fog,blend);
 }
 void main() {
     if(visual_debug.x>11.5) {out_fragColor=vec4(vec3(params.x>7.5?1.0:0.0),1.0);return;}

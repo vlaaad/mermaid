@@ -1,4 +1,5 @@
 #version 140
+#include "/render/water_depth.glsl"
 in highp vec3 var_world;
 in highp float var_depth;
 out vec4 out_fragColor;
@@ -56,5 +57,6 @@ void main() {
     vec3 fog=mix(vec3(.061,.485,.875),fog_settings.rgb,clamp(ray.y*.9+.42,0.0,1.0));
     float blend=1.0-exp(-max(var_depth-3.0,0.0)*fog_settings.w);
     blend=max(blend,smoothstep(165.0,300.0,var_depth));
+    fog*=waterHazeLight(camera_pos.y,ray.y);
     out_fragColor=vec4(mix(color,fog,blend),1.0);
 }

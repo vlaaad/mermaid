@@ -5,12 +5,12 @@ uniform mediump sampler2D scene_texture;
 uniform highp sampler2D scene_depth;
 uniform highp sampler2D water_texture;
 uniform fs_uniforms { mediump vec4 screen_size; mediump vec4 visual_debug; };
-float linearDepth(float d){return .15*400.0/(400.0-d*(400.0-.15));}
+highp float linearDepth(highp float d){return .15*400.0/(400.0-d*(400.0-.15));}
 void main() {
-    vec2 uv=vec2(var_uv.x,1.0-var_uv.y);
+    highp vec2 uv=vec2(var_uv.x,1.0-var_uv.y);
     vec3 color=texture(scene_texture,uv).rgb;
     if(visual_debug.x>4.5){out_fragColor=vec4(color,1.0);return;}
-    float z=linearDepth(texture(scene_depth,uv).r);
+    highp float z=linearDepth(texture(scene_depth,uv).r);
     // Depth-aware upsampling smooths the water without smearing across the character.
     vec2 pixel=uv*screen_size.zw-.5;
     vec2 base=floor(pixel),f=fract(pixel);

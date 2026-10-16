@@ -1,0 +1,12 @@
+size { x: 160 y: 40 }
+color { x: .82 y: .94 z: .97 w: .8 }
+outline { x: 0 y: .08 z: .12 w: .25 }
+shadow { x: 0 y: .03 z: .06 w: .6 }
+leading: 1
+tracking: 0
+pivot: PIVOT_NE
+blend_mode: BLEND_MODE_ALPHA
+line_break: false
+text: ""
+font: "/builtins/fonts/default.font"
+material: "/builtins/fonts/label.material"

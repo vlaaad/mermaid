@@ -1,4 +1,5 @@
 #version 140
+#include "/render/water_depth.glsl"
 in mediump vec2 var_uv;
 out vec4 out_fragColor;
 uniform fs_uniforms {
@@ -15,5 +16,5 @@ void main(){
  vec3 sun=normalize(vec3(.35,.90,-.24));
  vec3 fog=mix(vec3(0.061000,0.485000,0.875000),fog_settings.rgb,clamp(ray.y*.9+.42,0.0,1.0));
  fog+=vec3(.012,.035,.04)*pow(max(dot(ray,sun),0.0),5.0);
- out_fragColor=vec4(fog,1.0);
+ out_fragColor=vec4(fog*waterHazeLight(camera_pos.y,ray.y),1.0);
 }

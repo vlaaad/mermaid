@@ -64,6 +64,7 @@ try:
   'back':dict(position=v(.4,4.8,-18.2),camera=v(6.15,9.92,-24.43),look=v(-10,-.75,-6.65)),
   'right':dict(position=v(14,3,-15),camera=v(18,7,-8),look=v(9,-3,-22)),
   'left':dict(position=v(-8,3,-12),camera=v(-3,9,-5),look=v(-14,-3,-22)),
+  'deep':dict(position=v(3,-70,65),camera=v(8,-65,74),look=v(3,-82,65)),
  }.items():
   channels={mode:capture(f'coverage-{name}-{mode}',pose,mode)[...,0]/255 for mode in (0,6,7,9,12)}
   near,far,weight,sand=(channels[mode] for mode in (6,7,9,12))
@@ -77,7 +78,7 @@ try:
   assert results['column_open_edges']==0,('Column mesh has holes',results)
   assert min(results[f'pass_overlap_time_{t}'] for t in (3,7))>.995,('Visible and shadow geometry differ',results)
   assert results['visible_actor_pixels_moved']==0,('Environmental actors still animate in the shader',results)
-  assert max(results[f'{view}_ground_interior_disagreement'] for view in ('wide','close','back','right','left'))<.001,('Near/far shadow interiors disagree',results)
+  assert max(results[f'{view}_ground_interior_disagreement'] for view in ('wide','close','back','right','left','deep'))<.001,('Near/far shadow interiors disagree',results)
 finally:
  g.command('mermaid.lighting',dict(mode=0));g.command('mermaid.capture',{})
  if args.keep_running:g.command('mermaid.resume',{});g.close()

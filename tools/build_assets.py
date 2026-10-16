@@ -14,6 +14,7 @@ import struct
 
 import numpy as np
 from PIL import Image
+import bathymetry
 from water_patterns import caustics as bake_caustics, surface_normals, sunlight_aperture
 from world_geometry import triangles as read_triangles, rotation as rotation_matrix, convex_collider, Support
 
@@ -629,16 +630,8 @@ def main():
     silver=fish();silver.c=[(.65,.73,.63,1) if c[0]>.1 else c for c in silver.c];silver.save('fish_silver','fish')
     ray().save('ray','ray')
     mermaid().save('mermaid','mermaid')
-    ground=Mesh()
-    # Keep the existing detailed floor; coarse outer strips hide its rectangle
-    # beyond the400m far plane, including orbit views at the travel boundaries.
-    ground_x=[-600,*range(-60,65,4),600]
-    ground_z=[-600,*range(-125,24,4),600]
-    for z,z_next in zip(ground_z,ground_z[1:]):
-        for x,x_next in zip(ground_x,ground_x[1:]):
-            def p(xx,zz): return (xx,-4.25+.13*math.sin(xx*.3)*math.cos(zz*.19),zz)
-            ground.quad(p(x,z),p(x,z_next),p(x_next,z_next),p(x_next,z),(.19,.42,.48))
-    ground.save('seabed','sand')
+    bathymetry.mesh(Mesh).save('seabed','sand')
+    bathymetry.export_collision(ROOT/'main/seafloor.lua')
     surface=Mesh()
     surface.quad((-1000,50,200),(1000,50,200),(1000,50,-1000),(-1000,50,-1000),(.12,.64,.83))
     surface.save('surface','surface')
@@ -916,6 +909,7 @@ def main():
     outcrop_top=at(.55,.85,20)
     rock_top=max(p[1] for p in make_rock(103).p)
     place('rock3_detail',outcrop_top-vec((0,rock_top*3.7,0)),(2.10,3.7,1.80),.12,True,label='foreground_outcrop')
+    bathymetry.populate(place)
     # Remove only obsolete outputs from the abandoned mesh-baking experiment.
     for stale in list(OUT.glob('ruins_chunk_*')) + [OUT/(n+ext) for n in ('fish_field','fish_blue_field','dust_field') for ext in ('.glb','.model','.go')]:
         if stale.suffix in ('.glb','.model','.go') and stale.exists():stale.unlink()

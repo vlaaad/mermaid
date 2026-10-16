@@ -1,6 +1,8 @@
 -- Broad AABBs reject distant stone; convex planes follow the visible boulders.
 local M={}
 local obstacles=require 'main.obstacles'
+local seafloor=require 'main.seafloor'
+M.floor_height=seafloor.sample
 local shape={
     {0,1.60,-.28,.37}, {0,.95,-.18,.35}, {0,.30,.06,.40},
     {0,-.40,.35,.35}, {-.18,-1.05,.95,.28}, {-.18,-1.95,1.40,.65}
@@ -55,9 +57,16 @@ function M.resolve(position,body)
                 end
             end
         end
+        if py+body.miny< -4.0 then
+            for _,s in ipairs(body) do
+                local h,ax,ay,az=seafloor.sample(px+s[1],pz+s[3])
+                local gap=s[4]-(py+s[2]-h)*ay
+                if gap>deepest then deepest=gap;nx,ny,nz=ax,ay,az end
+            end
+        end
         if deepest<=.0001 then break end
         px=px+nx*(deepest+.001);py=py+ny*(deepest+.001);pz=pz+nz*(deepest+.001)
     end
-    return vmath.vector3(clamp(px,-52,58),clamp(py,-1.5,36),clamp(pz,-124,9))
+    return vmath.vector3(clamp(px,-130,135),math.min(py,49-body.maxy),clamp(pz,-185,85))
 end
 return M

@@ -2,7 +2,7 @@
 in highp vec3 var_world;
 out highp vec4 out_fragColor;
 void main() {
-    if(var_world.y< -4.4)discard;
+
     // Shift both exponential warps into [-1,1]. Defold clears color through
     // uint8 values, so an empty texel must be expressible as (1,1,0,0).
     highp float z=gl_FragCoord.z;
