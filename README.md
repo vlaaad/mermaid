@@ -4,7 +4,7 @@
 
 Build an interactive 3D scene matching `Blonde-Mermaid-in-Atlantis-Ruins.png`, with satisfying keyboard/mouse swimming on desktop and browser. Target hardware: Intel HD530 laptop; aim for 30 FPS.
 
-**Current target: 20% of pixels within 10 RGB levels per channel. Latest measured: 19.78% (pass104).** Exact matches: 0.0164%; RGB MAE: 9.6804%; SSIM: 0.47232. These are diagnostics, not overall fidelity percentages. Evidence: `artifacts/progress/pass104/`.
+**Current target: 20% of pixels within 10 RGB levels per channel. Latest measured: 19.93% (pass105).** Exact matches: 0.0177%; RGB MAE: 9.6662%; SSIM: 0.47545. These are diagnostics, not overall fidelity percentages. Evidence: `artifacts/progress/pass105/`.
 
 Retained work: broader pointed fins with clean concave topology and filtered veins; larger head/scalp; lower arms and flowing locks; rotated connected arcade, deeper column fluting, all 11 required column regions present; olive grass with three corrected roots; blue rock/floor materials with softer sand caustics, height-based bottom-water haze, stronger surface sunlight patch with softer wave facets, foreground stone volume with local bevel detail. Native pass87: 24.0ms mean / 24.5ms p95, 78 draws. Previous slow profiles overlapped CPU-heavy fitting; do not attribute them solely to rock bevels.
 
