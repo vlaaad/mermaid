@@ -132,10 +132,10 @@
     "bytes": 1384
   },
   "particle": {
-    "triangles": 16,
-    "vertices": 30,
-    "unindexed_vertices": 48,
-    "bytes": 2908
+    "triangles": 2,
+    "vertices": 4,
+    "unindexed_vertices": 6,
+    "bytes": 1440
   },
   "fullscreen": {
     "triangles": 2,

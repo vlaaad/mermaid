@@ -18,10 +18,14 @@ out=args.output
 out.mkdir(parents=True,exist_ok=True)
 def v(x,y,z):return dict(x=x,y=y,z=z)
 views={
+ 'bubble':dict(camera=v(-4.53,9.01,-30.68),look=v(-4.53,9.01,-31.09)),
  'fin-rear':dict(camera=v(-.5,4.9,9),look=v(-1,4.4,4)),
  'fin-side':dict(camera=v(3.6,4.7,4.5),look=v(-1,4.5,4)),
+ 'surface-ruins':dict(camera=v(0,7,13),look=v(11,27,-44)),
  'sun':dict(camera=v(-.4,7,13),look=v(16,50,0)),
  'sand':dict(position=v(0,-1,-10),camera=v(3,2,-3),look=v(0,-3,-13)),
+ 'shadow-close':dict(position=v(0,1.5,-5),camera=v(3.1,5.2,1),look=v(0,-2,-8)),
+ 'shadow-wide':dict(position=v(7,1,-11),camera=v(10,6,-3),look=v(7,-3,-14)),
 }
 try:
  g.wait_for_state('mermaid.ready',True,timeout=45)

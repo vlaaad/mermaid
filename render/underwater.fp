@@ -9,6 +9,7 @@ out vec4 out_fragColor;
 uniform mediump sampler2D caustics;
 uniform mediump sampler2D stone_detail;
 uniform highp sampler2D sun_depth;
+uniform highp sampler2D near_shadow;
 uniform fs_uniforms {
     mediump vec4 time_data;
     mediump vec4 params;
@@ -16,6 +17,7 @@ uniform fs_uniforms {
     mediump vec4 fog_settings;
     highp vec4 camera_pos;
     highp mat4 light_matrix;
+    highp mat4 near_light_matrix;
 };
 const float CAUSTIC_GAIN=.68;
 const float STONE_CAUSTIC_RESPONSE=.35;
@@ -31,7 +33,24 @@ float filteredShadow(vec2 uv,float receiver,vec2 slope) {
     float d=step(receiver+dot(slope,tap+vec2(1,1)/1024.0-uv),texture(sun_depth,tap+vec2(1,1)/1024.0).r);
     return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);
 }
+highp float bound(highp vec2 moments,highp float receiver) {
+    highp float variance=max(moments.y-moments.x*moments.x,pow(abs(receiver)*.004,2.0));
+    highp float delta=receiver-moments.x;
+    return receiver<=moments.x?1.0:variance/(variance+delta*delta);
+}
+highp float nearVisibility(highp vec3 q) {
+    highp vec4 m=texture(near_shadow,q.xy);
+    highp float w=40.0*(q.z-.00012-.5);
+    highp float v=min(bound(m.xy,exp(w)),bound(m.zw,-exp(-w)));
+    return clamp((v-.15)/.85,0.0,1.0);
+}
 float visibility(vec3 p,vec3 normal,float ndl) {
+    highp vec3 nearQ=(near_light_matrix*vec4(p+normal*.015,1.0)).xyz*.5+.5;
+    float edge=min(min(nearQ.x,nearQ.y),min(1.0-nearQ.x,1.0-nearQ.y));
+    float nearWeight=smoothstep(.015,.075,edge);
+    if(nearQ.z<0.0 || nearQ.z>1.0)nearWeight=0.0;
+    float closeShadow=nearWeight>0.0?nearVisibility(nearQ):1.0;
+    if(nearWeight>=1.0)return closeShadow;
     if(abs(light_matrix[3].w)<.0001)return 1.0;
     vec4 light=light_matrix*vec4(p+normal*.025,1.0);
     vec3 q=light.xyz/light.w*.5+.5;
@@ -41,7 +60,7 @@ float visibility(vec3 p,vec3 normal,float ndl) {
     slope=clamp(slope,vec2(-1.0),vec2(1.0));
     if(q.x<.002 || q.y<.002 || q.x>.998 || q.y>.998 || q.z>1.0 || q.z<0.0)return 1.0;
     float bias=.00015+.00012*(1.0-ndl);
-    return filteredShadow(q.xy,q.z-bias,slope);
+    return mix(filteredShadow(q.xy,q.z-bias,slope),closeShadow,nearWeight);
 }
 
 
@@ -58,7 +77,7 @@ vec3 fogged(vec3 shaded,float density,bool surface) {
     return mix(shaded,fog,blend);
 }
 void main() {
-    if(visual_debug.x>4.5) {
+    if(visual_debug.x>4.5 && visual_debug.x<5.5) {
         float architecture=(params.x<.5 && var_color.a<.4)?1.0:0.0;
         out_fragColor=vec4(vec3(architecture),1.0);
         return;
@@ -72,6 +91,7 @@ void main() {
     // Bias a thin fin toward the light on either side to avoid self-shadow acne.
     if(params.x>2.5 && params.x<3.5 && var_color.a>.37 && var_color.a<.62 && dot(geometric,sun)<0.0)geometric=-geometric;
     float shadow=visibility(var_world,geometric,diffuse);
+    if(visual_debug.x>5.5) {out_fragColor=vec4(vec3(shadow),1.0);return;}
     float t=time_data.x;
     // Refraction projects a larger pattern onto receiving surfaces, absent in shade.
     vec2 uv=(var_world.xz+var_world.y*vec2(-.389,.267))*.035;

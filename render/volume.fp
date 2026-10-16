@@ -3,12 +3,11 @@ in mediump vec2 var_uv;
 out vec4 out_fragColor;
 uniform highp sampler2D scene_depth;
 uniform highp sampler2D sun_depth;
+uniform mediump sampler2D surface_flux;
 uniform fs_uniforms {
     highp mat4 inverse_view_projection;
     highp mat4 light_matrix;
     highp vec4 camera_pos;
-    mediump vec4 time_data;
-    mediump vec4 screen_size;
     mediump vec4 visual_debug;
 };
 vec3 worldAt(vec2 uv,float depth) {
@@ -17,55 +16,68 @@ vec3 worldAt(vec2 uv,float depth) {
 }
 float linearDepth(float d){return .15*400.0/(400.0-d*(400.0-.15));}
 float sunVisible(vec3 p) {
-    vec4 l=light_matrix*vec4(p,1.0);
-    vec3 q=l.xyz/l.w*.5+.5;
-    if(q.x<0.0 || q.y<0.0 || q.x>1.0 || q.y>1.0)return 1.0;
-    return step(q.z-.0014,texture(sun_depth,q.xy).r);
+    vec3 q=(light_matrix*vec4(p,1.0)).xyz*.5+.5;
+    if(q.x<.002 || q.y<.002 || q.x>.998 || q.y>.998 || q.z<0.0 || q.z>1.0)return 1.0;
+    // Filter visibility, never raw shadow depth. The soft depth transition also
+    // resolves partial occlusion along a water interval instead of switching it.
+    vec2 pixel=q.xy*1024.0-.5,base=floor(pixel),f=fract(pixel);
+    vec2 uv=(base+.5)/1024.0;
+    vec4 depths=vec4(texture(sun_depth,uv).r,texture(sun_depth,uv+vec2(1,0)/1024.0).r,
+                     texture(sun_depth,uv+vec2(0,1)/1024.0).r,texture(sun_depth,uv+vec2(1,1)/1024.0).r);
+    vec4 v=smoothstep(vec4(q.z-.0018),vec4(q.z+.0002),depths);
+    return mix(mix(v.x,v.y,f.x),mix(v.z,v.w,f.x),f.y);
 }
 void main() {
-    // glTF imports V flipped. All render-target lookups use the restored UV.
     vec2 uv=vec2(var_uv.x,1.0-var_uv.y);
-    vec3 color=vec3(0.0);
-    float depth=texture(scene_depth,uv).r;
-    vec3 hit=worldAt(uv,depth);
-    vec3 delta=hit-camera_pos.xyz;
+    float depth=texture(scene_depth,uv).r,z=linearDepth(depth);
+    vec3 hit=worldAt(uv,depth),delta=hit-camera_pos.xyz;
     float travel=length(delta);
-    vec3 dir=delta/max(travel,.0001);
-    float z=linearDepth(depth);
-    // Integrate actual world-space water up to the opaque surface. No ray cards.
-    // Surface ripples modulate sunlight along parallel refracted light paths.
-    float limit=min(travel,80.0);
-    float stride=limit/24.0;
-    // Midpoint integration is spatially continuous. A static per-pixel hash at
-    // quarter resolution imprints a 4px checker/noise pattern on the ceiling.
-    float jitter=.5;
-    float scatter=0.0;
-    for(int i=0;i<24;i++) {
-        float d=(float(i)+jitter)*stride;
-        vec3 p=camera_pos.xyz+dir*d;
-        float below=50.0-p.y;
-        vec2 surface=p.xz+below*vec2(.389,-.267);
-        // Refraction by different wave slopes spreads the shafts slightly. Each
-        // remains a world-space volume, occluded by the same sun shadow map.
-        vec2 slope=vec2(sin(surface.y*.12+time_data.x*.17),cos(surface.x*.14-time_data.x*.13));
-        vec2 s=surface+slope*(.30+below*.035);
-        float bands=.5+.5*sin(s.x*.73+s.y*.19+sin(s.y*.21)*1.5);
-        float broken=.5+.5*sin(s.y*.34-s.x*.15+time_data.x*.08);
-        float b2=bands*bands,b4=b2*b2,b8=b4*b4;
-        float narrow=b8*b8*(.25+.75*broken*broken*broken);
-        float w=.5+.5*sin(s.x*.31+s.y*.11+1.7);
-        float w2=w*w,w4=w2*w2;
-        float wide=w4*w4*w2;
-        vec2 patch=(s-vec2(18,-38))/vec2(65,85);
-        float aperture=(narrow*.95+wide*.22)*exp(-dot(patch,patch));
-        float water=smoothstep(-6.0,-3.5,p.y)*(1.0-smoothstep(49.0,51.0,p.y));
-        scatter+=(.025+aperture)*sunVisible(p)*water*exp(-d*.027)*stride;
+    vec3 dir=delta/max(travel,.0001),sun=normalize(vec3(.35,.90,-.24));
+    float end=min(travel,100.0),start=0.0;
+    if(abs(dir.y)>.0001) {
+        float a=(-4.25-camera_pos.y)/dir.y,b=(50.0-camera_pos.y)/dir.y;
+        start=max(start,min(a,b));end=min(end,max(a,b));
     }
-    float forward=.75+pow(max(dot(dir,normalize(vec3(.35,.90,-.24))),0.0),3.0)*1.7;
-    color+=vec3(.54,.65,.68)*scatter*.055*forward;
+    // Integrate a uniform participating medium. Ruins occlude the sun; there
+    // are no authored beam sprites, aperture cylinders or moving noise clouds.
+    // Anchor interval boundaries to world planes to avoid a sample lattice
+    // following the player. The dominant ray axis keeps all intervals bounded.
+    vec3 ad=abs(dir),axis=vec3(0,0,1);
+    if(ad.x>=ad.y && ad.x>=ad.z)axis=vec3(1,0,0);
+    else if(ad.y>=ad.z)axis=vec3(0,1,0);
+    float origin=dot(camera_pos.xyz,axis),rate=dot(dir,axis);
+    const float spacing=1.75;
+    float plane=floor(origin/spacing)*spacing;
+    if(rate>0.0)plane+=spacing;
+    float first=(plane-origin)/rate,stepLength=spacing/abs(rate);
+    // Beer-Lambert extinction along the view and the incoming sunlight path.
+    // Integrate transmittance exactly within each interval (Hillaire 2015).
+    const float extinction=.0165;
+    float combined=extinction-.008*dir.y/sun.y;
+    float transmission=exp(-combined*start),scatter=0.0,lo=start;
+    for(int i=0;i<64;i++) {
+        float hi=min(end,first+float(i)*stepLength);
+        if(hi>lo) {
+            float nextTransmission=exp(-combined*hi);
+            vec3 p=camera_pos.xyz+dir*((lo+hi)*.5);
+            // Refractive flux uses the same ray-baked caustic field and light
+            // projection as the seabed. Prefilter sub-interval detail to prevent
+            // aliasing; the field is invariant along the sun, not the camera.
+            vec2 lightUV=(p.xz-p.y*sun.xz/sun.y)*.035;
+            float flux=.20+textureLod(surface_flux,lightUV,3.0).r*6.65;
+            scatter+=sunVisible(p)*flux*(transmission-nextTransmission);
+            transmission=nextTransmission;
+            lo=hi;
+        }
+        if(lo>=end)break;
+    }
+    float mu=dot(dir,sun),g=.65;
+    float phase=(1.0-g*g)/pow(1.0+g*g-2.0*g*mu,1.5);
+    float solarTransmission=exp(-max(50.0-camera_pos.y,0.0)*.008/sun.y);
+    vec3 color=vec3(.90,.98,1.0)*scatter*(extinction/combined)*solarTransmission*phase*.11;
     if(visual_debug.x>.5 && visual_debug.x<1.5)color=vec3(z/70.0);
-    if(visual_debug.x>1.5 && visual_debug.x<2.5)color=vec3(scatter*.12);
+    if(visual_debug.x>1.5 && visual_debug.x<2.5)color=vec3(scatter*.5);
     if(visual_debug.x>2.5 && visual_debug.x<3.5)color=vec3(sunVisible(hit));
     if(visual_debug.x>3.5 && visual_debug.x<4.5)color=fract(hit*.04);
-    out_fragColor=vec4(color,clamp(z/180.0,0.0,1.0));
+    out_fragColor=vec4(color,z);
 }

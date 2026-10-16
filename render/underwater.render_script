@@ -1,6 +1,6 @@
-local function target(w,h,depth_texture)
+local function target(w,h,depth_texture,format)
     return render.render_target({
-        [graphics.BUFFER_TYPE_COLOR0_BIT]={format=graphics.TEXTURE_FORMAT_RGBA,width=w,height=h,min_filter=graphics.TEXTURE_FILTER_LINEAR,mag_filter=graphics.TEXTURE_FILTER_LINEAR,u_wrap=graphics.TEXTURE_WRAP_CLAMP_TO_EDGE,v_wrap=graphics.TEXTURE_WRAP_CLAMP_TO_EDGE},
+        [graphics.BUFFER_TYPE_COLOR0_BIT]={format=format or graphics.TEXTURE_FORMAT_RGBA,width=w,height=h,min_filter=graphics.TEXTURE_FILTER_LINEAR,mag_filter=graphics.TEXTURE_FILTER_LINEAR,u_wrap=graphics.TEXTURE_WRAP_CLAMP_TO_EDGE,v_wrap=graphics.TEXTURE_WRAP_CLAMP_TO_EDGE},
         [graphics.BUFFER_TYPE_DEPTH_BIT]={format=graphics.TEXTURE_FORMAT_DEPTH,width=w,height=h,flags=depth_texture and render.TEXTURE_BIT or 0,min_filter=graphics.TEXTURE_FILTER_NEAREST,mag_filter=graphics.TEXTURE_FILTER_NEAREST,u_wrap=graphics.TEXTURE_WRAP_CLAMP_TO_EDGE,v_wrap=graphics.TEXTURE_WRAP_CLAMP_TO_EDGE}
     })
 end
@@ -8,8 +8,9 @@ end
 function init(self)
     self.solid=render.predicate({"reefsolid"})
     self.thin=render.predicate({"reefthin"})
+    self.bubbles=render.predicate({"bubbles"})
     self.casters={}
-    for _,category in ipairs({0,1,2,3,6}) do self.casters[category]=render.predicate({"caster"..category}) end
+    for _,category in ipairs({0,1,2,3,6,8}) do self.casters[category]=render.predicate({"caster"..category}) end
     self.shadow_constants=render.constant_buffer()
     self.text=render.predicate({"text"})
     self.blit=render.predicate({"blit"})
@@ -20,6 +21,10 @@ function init(self)
     self.constants.camera_pos=vmath.vector4(0,7,13,1)
     self.constants.fog_settings=vmath.vector4(0.062500,0.625000,0.945500,.0165)
     self.shadow=target(1024,1024,true)
+    self.near_shadow=target(512,512,false,graphics.TEXTURE_FORMAT_RGBA32F)
+    self.near_ping=target(512,512,false,graphics.TEXTURE_FORMAT_RGBA32F)
+    self.blur_constants=render.constant_buffer()
+    self.shadow_focus=vmath.vector3(-1,4.8,4)
 end
 
 function update(self)
@@ -31,7 +36,7 @@ function update(self)
         self.target=target(rw,rh,true)
         self.composite=target(rw,rh,false)
         self.rw,self.rh=rw,rh
-        self.water=target(math.ceil(rw/4),math.ceil(rh/4),false)
+        self.water=target(math.ceil(rw/4),math.ceil(rh/4),false,graphics.TEXTURE_FORMAT_RGBA16F)
     elseif rw~=self.rw or rh~=self.rh then
         render.set_render_target_size(self.target,rw,rh)
         render.set_render_target_size(self.composite,rw,rh)
@@ -71,6 +76,48 @@ function update(self)
     render.disable_material()
     render.disable_state(graphics.STATE_CULL_FACE)
 
+    -- Small stable near cascade. Filter moments once, rather than dozens of
+    -- shadow comparisons per full-resolution receiver pixel.
+    local focus=self.shadow_focus
+    local near_center=focus-sun*(focus.y/sun.y)
+    local near_texel=24/512
+    local nx=vmath.dot(near_center,right);local ny=vmath.dot(near_center,up)
+    near_center=near_center+right*(math.floor(nx/near_texel+.5)*near_texel-nx)+up*(math.floor(ny/near_texel+.5)*near_texel-ny)
+    local near_view=vmath.matrix4_look_at(near_center+sun*60,near_center,vmath.vector3(0,0,1))
+    local near_proj=vmath.matrix4_orthographic(-12,12,-12,12,1,120)
+    self.constants.near_light_matrix=near_proj*near_view
+    render.set_render_target(self.near_shadow)
+    render.set_viewport(0,0,512,512)
+    render.clear({[graphics.BUFFER_TYPE_COLOR0_BIT]=vmath.vector4(math.exp(20),math.exp(40),-math.exp(-20),math.exp(-40)),[graphics.BUFFER_TYPE_DEPTH_BIT]=1})
+    render.set_view(near_view)
+    render.set_projection(near_proj)
+    render.enable_material("shadow_moments")
+    for _,category in ipairs({0,1,2,3,6,8}) do
+        self.shadow_constants.params=vmath.vector4(category,0,0,0)
+        if category==0 or category==8 then
+            render.enable_state(graphics.STATE_CULL_FACE)
+            render.set_cull_face(graphics.FACE_TYPE_BACK)
+        else render.disable_state(graphics.STATE_CULL_FACE) end
+        render.draw(self.casters[category],{constants=self.shadow_constants,frustum=self.constants.near_light_matrix})
+    end
+    render.disable_material()
+    render.disable_state(graphics.STATE_CULL_FACE)
+    render.disable_state(graphics.STATE_DEPTH_TEST)
+    render.set_depth_mask(false)
+    render.enable_material("shadow_blur")
+    render.set_render_target(self.near_ping)
+    render.enable_texture("moments",self.near_shadow,graphics.BUFFER_TYPE_COLOR0_BIT)
+    self.blur_constants.blur_direction=vmath.vector4(1/512,0,0,0)
+    render.draw(self.blit,{constants=self.blur_constants})
+    render.disable_texture("moments")
+    render.set_render_target(self.near_shadow)
+    render.enable_texture("moments",self.near_ping,graphics.BUFFER_TYPE_COLOR0_BIT)
+    self.blur_constants.blur_direction=vmath.vector4(0,1/512,0,0)
+    render.draw(self.blit,{constants=self.blur_constants})
+    render.disable_texture("moments")
+    render.disable_material()
+
+    render.set_depth_mask(true)
     render.set_render_target(self.target)
     render.clear({[graphics.BUFFER_TYPE_COLOR0_BIT]=vmath.vector4(0.062500,0.625000,0.945500,1),[graphics.BUFFER_TYPE_DEPTH_BIT]=1})
     render.set_viewport(0,0,rw,rh)
@@ -86,21 +133,32 @@ function update(self)
     render.set_depth_mask(true)
     render.enable_state(graphics.STATE_DEPTH_TEST)
     render.enable_texture("sun_depth",self.shadow,graphics.BUFFER_TYPE_DEPTH_BIT)
+    render.enable_texture("near_shadow",self.near_shadow,graphics.BUFFER_TYPE_COLOR0_BIT)
     render.enable_state(graphics.STATE_CULL_FACE)
     render.set_cull_face(graphics.FACE_TYPE_BACK)
     render.draw(self.solid,{constants=self.constants,frustum=projection*self.view})
     render.disable_state(graphics.STATE_CULL_FACE)
     render.draw(self.thin,{constants=self.constants,frustum=projection*self.view})
+    render.disable_texture("near_shadow")
     render.set_depth_mask(false)
+    render.enable_state(graphics.STATE_BLEND)
+    render.set_blend_func(graphics.BLEND_FACTOR_ONE,graphics.BLEND_FACTOR_ONE_MINUS_SRC_ALPHA)
+    render.enable_state(graphics.STATE_CULL_FACE)
+    render.set_cull_face(graphics.FACE_TYPE_BACK)
+    render.draw(self.bubbles,{constants=self.constants,frustum=projection*self.view})
+    render.disable_state(graphics.STATE_CULL_FACE)
+    render.disable_state(graphics.STATE_BLEND)
     render.disable_state(graphics.STATE_DEPTH_TEST)
     self.constants.inverse_view_projection=vmath.inv(projection*self.view)
     self.constants.screen_size=vmath.vector4(rw,rh,math.ceil(rw/4),math.ceil(rh/4))
     render.set_render_target(self.water)
     render.set_viewport(0,0,math.ceil(rw/4),math.ceil(rh/4))
     render.enable_texture("scene_depth",self.target,graphics.BUFFER_TYPE_DEPTH_BIT)
+    if self.surface_flux then render.enable_texture("surface_flux",self.surface_flux) end
     render.enable_material("volume")
     render.draw(self.blit,{constants=self.constants})
     render.disable_material()
+    if self.surface_flux then render.disable_texture("surface_flux") end
     render.set_render_target(self.composite)
     render.set_viewport(0,0,rw,rh)
     render.enable_texture("scene_texture",self.target,graphics.BUFFER_TYPE_COLOR0_BIT)
@@ -126,10 +184,12 @@ function update(self)
 end
 
 function on_message(self,id,message)
+    if id==hash("surface_flux") then self.surface_flux=message.texture end
     if id==hash("lighting_debug") then self.constants.visual_debug=vmath.vector4(message.mode,0,0,0) end
     if id==hash("scene_camera") then
         self.view=message.view
         self.constants.camera_pos=message.position
         self.constants.time_data=message.time_data
+        self.shadow_focus=message.shadow_focus or self.shadow_focus
     end
 end

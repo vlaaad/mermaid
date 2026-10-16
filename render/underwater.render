@@ -3,3 +3,6 @@ render_resources { name: "shadow" path: "/render/shadow.material" }
 render_resources { name: "volume" path: "/render/volume.material" }
 render_resources { name: "background" path: "/render/background.material" }
 render_resources { name: "present" path: "/render/present.material" }
+
+render_resources { name: "shadow_moments" path: "/render/shadow_moments.material" }
+render_resources { name: "shadow_blur" path: "/render/shadow_blur.material" }

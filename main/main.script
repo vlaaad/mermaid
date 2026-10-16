@@ -1,3 +1,4 @@
+go.property("surface_flux", resource.texture("/assets/generated/caustics.png"))
 local obstacles = require "main.obstacles"
 local collision = require "main.collision"
 local function clamp(v,a,b) return math.max(a,math.min(b,v)) end
@@ -55,6 +56,7 @@ local function state(self)
 end
 
 function init(self)
+    msg.post("@render:","surface_flux",{texture=resource.get_texture_info(self.surface_flux).handle})
     msg.post(".","acquire_input_focus")
     reset(self,false)
     self.frames=0
@@ -113,7 +115,7 @@ function update(self,dt)
     self.bank=self.bank+(side*-.16-self.bank)*smooth(4,dt)
     self.tilt=self.tilt+(-.45+forward*.08-vertical*.14-self.tilt)*smooth(4,dt)
     local bank,tilt=self.bank,self.tilt
-    go.set_position(self.position+vmath.vector3(0,math.sin(self.time*1.4)*.035,0),"/player")
+    go.set_position(self.position,"/player")
     go.set_rotation(vmath.quat_rotation_y(self.heading)*vmath.quat_rotation_z(bank-.12)*vmath.quat_rotation_x(tilt),"/player")
     go.set_scale(.85,"/player")
     local offset=vmath.vector3(math.sin(self.yaw)*9*math.cos(self.pitch),1.36-math.sin(self.pitch)*9,math.cos(self.yaw)*9*math.cos(self.pitch))
@@ -147,7 +149,7 @@ function update(self,dt)
         look=vmath.vector3(l.x,l.y,l.z)
     end
     local view=vmath.matrix4_look_at(self.camera,look,vmath.vector3(0,1,0))
-    msg.post("@render:","scene_camera",{view=view,position=vmath.vector4(self.camera.x,self.camera.y,self.camera.z,1),time_data=vmath.vector4(self.time,self.speed,0,0)})
+    msg.post("@render:","scene_camera",{view=view,shadow_focus=self.position,position=vmath.vector4(self.camera.x,self.camera.y,self.camera.z,1),time_data=vmath.vector4(self.time,self.speed,0,0)})
     self.publish_timer=self.publish_timer+dt
     if self.publish_timer>=.2 then
         self.publish_timer=0

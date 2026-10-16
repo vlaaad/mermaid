@@ -166,7 +166,8 @@ class Mesh:
         sampler='scene_texture' if category=='blit' else 'caustics'
         pattern_texture = 'surface_water.png' if category == 'surface' else 'caustics.png'
         texture=f' textures {{ sampler: "{sampler}" texture: "/assets/generated/{pattern_texture}" }}\n'
-        if category not in ('blit','surface'):texture+=' textures { sampler: "stone_detail" texture: "/assets/textures/limestone-v1.png" }\n'
+        if category == 'dust':texture=''
+        if category not in ('blit','surface','dust'):texture+=' textures { sampler: "stone_detail" texture: "/assets/textures/limestone-v1.png" }\n'
         (OUT/f'{name}.model').write_text(f'mesh: "/assets/generated/{name}.glb"\nmaterials {{\n name: "reef"\n material: "/render/{category}.material"\n{texture}}}\n')
         # Visual offset keeps the physical swimming/camera anchor unchanged.
         model_offset = 'x:.20 y:-.22 z:0' if name == 'mermaid' else 'x:0 y:0 z:0'
@@ -634,7 +635,7 @@ def main():
     surface.quad((-1000,50,200),(1000,50,200),(1000,50,-1000),(-1000,50,-1000),(.12,.64,.83))
     surface.save('surface','surface')
     particle=Mesh()
-    particle.ellipsoid((0,0,0),(.025,.025,.025),(.38,.74,.80),3,4)
+    particle.quad((-.025,-.025,0),(.025,-.025,0),(.025,.025,0),(-.025,.025,0),(1,1,1))
     particle.save('particle','dust')
     fullscreen=Mesh()
     fullscreen.quad((-1,-1,0),(1,-1,0),(1,1,0),(-1,1,0),(1,1,1))

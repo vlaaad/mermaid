@@ -2,6 +2,4 @@ mesh: "/assets/generated/particle.glb"
 materials {
  name: "reef"
  material: "/render/dust.material"
- textures { sampler: "caustics" texture: "/assets/generated/caustics.png" }
- textures { sampler: "stone_detail" texture: "/assets/textures/limestone-v1.png" }
 }

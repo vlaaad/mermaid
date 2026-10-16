@@ -1,0 +1,9 @@
+name: "shadow_moments"
+tags: "shadow"
+vertex_program: "/render/underwater.vp"
+fragment_program: "/render/shadow_moments.fp"
+vertex_space: VERTEX_SPACE_LOCAL
+vertex_constants { name: "mtx_view" type: CONSTANT_TYPE_VIEW }
+vertex_constants { name: "mtx_proj" type: CONSTANT_TYPE_PROJECTION }
+vertex_constants { name: "time_data" type: CONSTANT_TYPE_USER }
+vertex_constants { name: "params" type: CONSTANT_TYPE_USER }

@@ -35,7 +35,7 @@ vec3 surfaceColor(float t) {
     highp vec3 reflected=reflect(incident,n);
     // At this depth, distant underwater reflections are dominated by blue
     // scattered light. No additional scene render or screen-space ray march.
-    highp vec3 under=mix(vec3(.045,.31,.50),vec3(.075,.44,.63),clamp(reflected.y*.5+.5,0.0,1.0));
+    highp vec3 under=mix(vec3(.055,.43,.69),vec3(.075,.54,.80),clamp(reflected.y*.5+.5,0.0,1.0));
     highp vec3 underwaterSun=normalize(vec3(.35,.90,-.24));
     highp vec3 sun=vec3(underwaterSun.x*eta,sqrt(1.0-dot(underwaterSun.xz,underwaterSun.xz)*eta*eta),underwaterSun.z*eta);
     highp float mu=dot(transmitted,sun);
@@ -44,7 +44,9 @@ vec3 surfaceColor(float t) {
     highp float aureole=exp((min(mu,1.0)-1.0)*95.0);
     highp vec3 sky=mix(vec3(.58,.80,.92),vec3(.22,.54,.87),sqrt(clamp(transmitted.y,0.0,1.0)));
     sky*=vec3(.68,1.02,1.12);
-    sky+=vec3(.65,.65,.48)*aureole+vec3(4.5,4.2,3.2)*disc;
+    float halo=exp((min(mu,1.0)-1.0)*28.0);
+    sky=mix(sky,vec3(.94,.98,1.0),halo*.85);
+    sky+=vec3(2.4,2.35,2.2)*aureole+vec3(5.0,4.9,4.6)*disc;
     return mix(sky,under,fresnel);
 }
 void main() {
@@ -52,7 +54,7 @@ void main() {
     vec3 color=surfaceColor(time_data.x);
     vec3 ray=normalize(var_world-camera_pos.xyz);
     vec3 fog=mix(vec3(.061,.485,.875),fog_settings.rgb,clamp(ray.y*.9+.42,0.0,1.0));
-    float blend=1.0-exp(-max(var_depth-3.0,0.0)*fog_settings.w*.22);
+    float blend=1.0-exp(-max(var_depth-3.0,0.0)*fog_settings.w);
     blend=max(blend,smoothstep(165.0,300.0,var_depth));
     out_fragColor=vec4(mix(color,fog,blend),1.0);
 }

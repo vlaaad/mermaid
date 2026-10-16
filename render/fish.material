@@ -22,3 +22,6 @@ samplers { name: "sun_depth" wrap_u: WRAP_MODE_CLAMP_TO_EDGE wrap_v: WRAP_MODE_C
 samplers { name: "stone_detail" wrap_u: WRAP_MODE_REPEAT wrap_v: WRAP_MODE_REPEAT filter_min: FILTER_MODE_MIN_LINEAR_MIPMAP_LINEAR filter_mag: FILTER_MODE_MAG_LINEAR }
 
 fragment_constants { name: "visual_debug" type: CONSTANT_TYPE_USER }
+
+fragment_constants { name: "near_light_matrix" type: CONSTANT_TYPE_USER_MATRIX4 }
+samplers { name: "near_shadow" wrap_u: WRAP_MODE_CLAMP_TO_EDGE wrap_v: WRAP_MODE_CLAMP_TO_EDGE filter_min: FILTER_MODE_MIN_LINEAR filter_mag: FILTER_MODE_MAG_LINEAR }
