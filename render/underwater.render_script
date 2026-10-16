@@ -18,7 +18,7 @@ function init(self)
     self.constants.visual_debug=vmath.vector4()
     self.constants.time_data=vmath.vector4(3,0,0,0)
     self.constants.camera_pos=vmath.vector4(0,7,13,1)
-    self.constants.fog_settings=vmath.vector4(0.062500,0.625000,0.945500,.016)
+    self.constants.fog_settings=vmath.vector4(0.062500,0.625000,0.945500,.0165)
     self.shadow=target(1024,1024,true)
 end
 
