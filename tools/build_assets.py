@@ -154,7 +154,8 @@ class Mesh:
         payload=struct.pack('<II',len(encoded),0x4e4f534a)+encoded+struct.pack('<II',len(binary),0x004e4942)+binary
         (OUT/f'{name}.glb').write_bytes(struct.pack('<III',0x46546c67,2,12+len(payload))+payload)
         sampler='scene_texture' if category=='blit' else 'caustics'
-        texture=f' textures {{ sampler: "{sampler}" texture: "/assets/generated/caustics.png" }}\n'
+        pattern_texture = 'surface_water.png' if category == 'surface' else 'caustics.png'
+        texture=f' textures {{ sampler: "{sampler}" texture: "/assets/generated/{pattern_texture}" }}\n'
         if category!='blit':texture+=' textures { sampler: "stone_detail" texture: "/assets/textures/limestone-v1.png" }\n'
         (OUT/f'{name}.model').write_text(f'mesh: "/assets/generated/{name}.glb"\nmaterials {{\n name: "reef"\n material: "/render/{category}.material"\n{texture}}}\n')
         # Visual offset keeps the physical swimming/camera anchor unchanged.
@@ -550,18 +551,27 @@ def main():
     fullscreen.quad((-1,-1,0),(1,-1,0),(1,1,0),(-1,1,0),(1,1,1))
     fullscreen.save('fullscreen','blit')
 
-    # Seamless cellular caustics. One shared texture, two scrolling samples per pixel.
+    # Receiver pattern only: curve cell boundaries by a seamless wave field.
+    # Preserve the old intensity distribution and the surface's entire texture,
+    # so this fitting pass does not retune brightness or change water appearance.
     rng=np.random.default_rng(73)
     yy,xx=np.mgrid[0:256,0:256]/256*7
-    nearest=np.full((256,256),1e6); second=nearest.copy()
-    for i in range(7):
-        for j in range(7):
-            px,py=i+rng.random(),j+rng.random()
-            dx=np.abs(xx-px);dx=np.minimum(dx,7-dx)
-            dy=np.abs(yy-py);dy=np.minimum(dy,7-dy)
+    sites=[(i+rng.random(),j+rng.random()) for i in range(7) for j in range(7)]
+    def receiver_pattern(x,y):
+        nearest=np.full((256,256),1e6);second=nearest.copy()
+        for px,py in sites:
+            dx=np.abs(x-px);dx=np.minimum(dx,7-dx)
+            dy=np.abs(y-py);dy=np.minimum(dy,7-dy)
             d=dx*dx+dy*dy
             second=np.minimum(second,np.maximum(nearest,d));nearest=np.minimum(nearest,d)
-    intensity=np.exp(-(np.sqrt(second)-np.sqrt(nearest))*29)
+        return np.exp(-(np.sqrt(second)-np.sqrt(nearest))*29)
+    surface_pattern=receiver_pattern(xx,yy)
+    u,v=xx/7,yy/7
+    wave_x=.38*np.sin(math.tau*(2*u+v)+.8)+.18*np.sin(math.tau*(3*v-u)+1.6)
+    wave_y=.34*np.sin(math.tau*(u-2*v)-.6)+.14*np.sin(math.tau*(3*u+v)+2.3)
+    curved=receiver_pattern((xx+wave_x)%7,(yy+wave_y)%7)
+    intensity=np.empty_like(curved)
+    intensity.ravel()[np.argsort(curved.ravel())]=np.sort(surface_pattern.ravel())
     from PIL import ImageFilter
     stone_rng=np.random.default_rng(841)
     def periodic_noise(power,stretch=1):
@@ -580,6 +590,7 @@ def main():
     water=np.fft.ifft2(np.fft.fft2(field)*band).real
     low,high=np.percentile(water,[1,99]);water=np.clip((water-low)/(high-low),0,1)
     Image.fromarray(np.uint8(np.clip(np.stack([intensity,stone,water],axis=-1),0,1)*255)).save(OUT/'caustics.png')
+    Image.fromarray(np.uint8(np.clip(np.stack([surface_pattern,stone,water],axis=-1),0,1)*255)).save(OUT/'surface_water.png')
 
     objects=[]; obstacles=[]
     placements=0

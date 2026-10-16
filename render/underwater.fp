@@ -18,7 +18,7 @@ uniform fs_uniforms {
     highp mat4 light_matrix;
 };
 // One-variable fitting pass: caustic contribution only.
-const float CAUSTIC_GAIN=1.20;
+const float CAUSTIC_GAIN=.90;
 const float STONE_CAUSTIC_RESPONSE=.35;
 float visibility(vec3 p,vec3 normal,float ndl) {
     if(abs(light_matrix[3].w)<.0001)return 1.0;
@@ -112,6 +112,8 @@ void main() {
     // Broad bounced sand light gives undersides a cool green fill.
     ambient+=vec3(.10,.19,.14)*(1.0-sky)*exp(-max(var_world.y,0.0)*.085);
     vec3 base=var_color.rgb;
+    // Sand reflectance only; keep the projected caustic contribution fixed.
+    if(params.x>7.5)base*=.90;
     if(params.x<.5 && base.b>base.r && base.r<.4) {
         vec3 weights=pow(abs(n),vec3(5.0));
         weights/=max(dot(weights,vec3(1.0)),.00001);
