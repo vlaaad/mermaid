@@ -13,7 +13,7 @@ void main(){
  vec4 farPoint=inverse_view_projection*vec4(uv*2.0-1.0,1.0,1.0);
  vec3 ray=normalize(farPoint.xyz/farPoint.w-camera_pos.xyz);
  vec3 sun=normalize(vec3(.35,.90,-.24));
- vec3 fog=mix(vec3(.050,.49,.86),fog_settings.rgb,clamp(ray.y*.9+.42,0.0,1.0));
+ vec3 fog=mix(vec3(0.061000,0.485000,0.875000),fog_settings.rgb,clamp(ray.y*.9+.42,0.0,1.0));
  fog+=vec3(.012,.035,.04)*pow(max(dot(ray,sun),0.0),5.0);
  out_fragColor=vec4(fog,1.0);
 }

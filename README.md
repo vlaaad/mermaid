@@ -1,107 +1,77 @@
-# Agent working memory — Mermaid
+# Mermaid — working notes
 
-## Goal and working rules
+## Goal and current result
 
-- Build a real interactive 3D underwater mermaid scene matching `Blonde-Mermaid-in-Atlantis-Ruins.png`: lighting, composition, level, models, textures and movement. Desktop/browser, keyboard/mouse. Old Intel HD530 laptop; ~30FPS is sufficient. Appearance first, profile meaningful regressions.
-- User's latest direction: **ONE visual element per fitting pass.** Freeze camera, geometry, pose/time and all unrelated settings. Match a specific element, inspect a real capture, then move on. Do not mix model/layout/lighting/palette/performance edits.
-- Work remains far from the visual target. The near-black diff/90% target is UNMET. Never describe average RGB error as a fidelity percentage. Similar blue water must not count as a missing blue column: verify actual geometry separately.
-- All actors stay independent/shared-mesh instances, including fish, rays and vegetation. No actor baking or reference-image backdrop/projection. Static geometry and shaders must survive swimming/camera orbit.
-- README is agent memory, not user marketing. Maintain commands, current evidence, pitfalls and next work. User authorizes local Git commits. Preserve their commits/work.
+Build an interactive 3D scene matching `Blonde-Mermaid-in-Atlantis-Ruins.png`, with satisfying keyboard/mouse swimming on desktop and browser. Target hardware: Intel HD530 laptop; aim for 30 FPS.
 
-## Current checkpoint — native pass53 (retained49 geometry), 2026-10-16
+**Current target: 20% of pixels within 10 RGB levels per channel. Latest measured: 16.78% (pass94).** Exact matches: 0.0131%; RGB MAE: 9.9455%; SSIM: 0.45267. These are diagnostics, not overall fidelity percentages. Evidence: `artifacts/progress/pass94/`.
 
-- Actual captures/metrics/diffs: `artifacts/progress/pass27` through `pass53`. Latest53 MAE11.2298%, SSIM.41551, exact-black.003665%, within10/channel8.8347%. Default artifacts/image-diff/ is current after a real zero-argument run. Browser53 rebuilt successfully and checked. These are diagnostics, NOT a close match. Baseline4: MAE11.8649%, SSIM.48805, tolerance4.4477%; structural similarity is still worse than baseline.
-- Caustic-only passes27→30: gain.22→.66→1.20; then stone response.35 while sand stays1.20. Pattern size/color/motion unchanged. Constants `CAUSTIC_GAIN` and `STONE_CAUSTIC_RESPONSE` in underwater.fp.
-- Clear seabed sample at960analysis: pixels(581,443)-(614,516). Reference display-luminance p10/50/90=.4409/.5377/.6604. Gain.22=.4583/.4821/.5120; gain.66=.4611/.4927/.5757; gain1.20=.4613/.5002/.6529. This fits bright seabed caustics, not their shape/color or every receiving surface. Recheck after other lighting/material changes.
-- Caustic-shape-only33→34: seamless domain-warped receiver cells, same complete R intensity histogram; G stone/B waves unchanged. Surface gets its own pixel-identical old packed texture(surface_water.png), so the ceiling stays unchanged.34 MAE12.1108/SSIM.40172: curves look more natural but phase/coverage still mismatch.35 is an UNCHANGED repeat, not a brightness trial.
-- Brightness-only34→36: gain1.20→.90, stone response still.35.37 tested ONLY sand reflectance(.72 multiplier), projected caustics unchanged. It made two patches too dark.38 uses.90 sand reflectance as a compromise measured across multiple shared floor patches(artifacts/progress/pass38/caustic-brightness.json). Patches still disagree: spatial lighting/pattern position cannot be fixed by a single gain. These are encoded display-luminance diagnostics, not radiance. Shape/coverage/color still differ.
-- Sea-color-only passes30→32: bottom/view-ray fog RGB(.050,.49,.86), top(.065,.61,1.0); density remains.016. Same fog function for background and objects. No camera/geometry/caustic changes.
-- Clear middle water box[x.495,y.37,x2.52,y2.42]: reference medianRGB(.1137,.6118,.9373), pass30(.0980,.5255,.7882), pass32(.1137,.6078,.9412). Upper box[.51,.17,.55,.23]: reference(.1922,.6863,.9686),32(.1804,.6824,.9490). Middle now within1 RGB level/channel, upper within5. These local results are not whole-image fidelity; patches still differ in gradients/texture.
-- Mermaid-position-only pass32→33: model component local offset(.20,-.22,0), maintained by generator. Physical spawn, camera, geometry, pose and lighting unchanged; head/body shift slightly right/down toward reference. Tail shape still wrong.
-- Tail-only43→44: raised fin attachment local(.0271,.3447,0), blended into lower3 taper rings; hips/upper tail unchanged. Narrowed left fluke and sheared right fluke left in REAL mesh coordinates. Reference UV anchors: fork(729/1672,692/941), tips(597/1672,815/941) and(709/1672,830/941). Offline projection replica uses real camera/heading-.22/bank-.12/tilt-.45 and frozen shader deformation; no runtime projection. Authored fin shape remains independent3D. All45624 non-tail source vertices(position,normal,color,UV) exactly unchanged; invariants inpass44. Normal scene reviewed, colors remain far too dark/green vsreference; fit fin material next and verify moving views.
-- Fin material44→45: brightness1.5x only.45→46: only fin vertex-color palette, root(.18,.38,.65)→edge(.63,.76,.72), rib blue.64. Pose/geometry unchanged. Normal diff inspected; brighter and bluer, silhouette/edge curvature still differ.
-- Hair-only46→47: long lock root Y1.55–1.86(was1.77–2.15), vertical sweep.75(was.88). Reveals rounded crown and lowers the broad locks, keeps flow tips near their prior height. Non-hair position/normal/color/UV exactly unchanged; invariants inpass47. Normal diff and current swimming/orbit views inspected; no hair/fin cutouts. Native movement PASS, frozen repeat pixel-identical in this run,5.023m W/8.867m boost(1.765x), rise3.700m, orbit1.240rad. Native Main Frame39.062ms mean/p9587.829,78draws. Browser48 subsequently rebuilt and verified; see current validation below.
-- Seabed-only47→48: kept every2294 existing triangle exactly; added280 coarse outer-strip triangles to±600m. No rock/layout/collision/material change. The hard rectangular floor edge is gone in actual orbit capture(pass48/orbit.png), opening image effectively unchanged. Opening native profile40.876ms mean/p9588.455,78draws; compare with39.062/p9587.829 prior run cautiously.
-- Ledge-only48→49: lowered rock3_1406 centerY4.2→3.2 and its three attached plants(kelp1398/coral_blue1414/kelp1425) by1m. All other layout transforms/RNG unchanged; collision box regenerated. Rim is closer to the lower reference step; shape/color remain wrong. Normal diff inspected.
-- REJECTED outcrop50–51: fewer GOs(1681 vs1722) but92draws vs78, Main57.54ms/p95110.02. First trial exposed too much floor; extended footing improved some metrics, still not a convincing match. Commitb7b3ea0 reverted by81c080a; DO NOT restore this cluster replacement blindly.52 SORT_NONE test increasedcalls to97; render script restored.53 confirms retained49 layout back at78draws, Main42.240ms/p9592.376. Official render manual(https://defold.com/manuals/render/) and local installed render.sdoc explain batch adjacency and sort_order; changing sort alone did not help here. All materials remain real instanced shared meshes.
-- Current models: fuller curved tail, asymmetric swept flukes, continuous Blender-finished skin, curled hair, hollow sponges, branching coral, broad ribbon-kelp, curved two-sided manta, independent orange/silver/gold/blue fish. Detailed beveled/eroded architectural meshes. Warm sunlight/transmitted leaf light and cooler ambient shade.
-- Render: normal opaque depth-tested pass, NO depth prepass.1024² sun shadow map/4PCF taps; quarter-res32step water scattering, depth-aware upsample/contact shading. Geometry AND post capped1280×720, then one-sample upscale to physical framebuffer. Far400, surfaceY50/plane±1000, ripple contrast fades90–180m, haze165–300m.
-- Surface-only39→40: fine/ridge spatial frequencies2.5x(.070/.0425); macro warp, receiving caustics and all geometry unchanged.40→41 surface facet/ridge contrast*.70.41→42 surface RGB tint(.48,.78,1);42→43(.53,.78,.994). No post grading/reference fitting. At960px surface box(288,2)-(500,38), reference median(.1451,.5922,.9137);41(.2196,.6902,.9176),42(.1373,.5922,.9176); current48(0.1451, 0.5922, 0.9137). Reproducible measurements inpass48/surface-probes.json. Before frequency change, highpass RMS1px.0042 vsref.0075; after freq/contrast41.0070. Curves/phase/lighting still differ, not matched water.
-- Shared GLBs now indexed by FULL float32 vertex tuple, preserving hard normals/UV seams/color IDs/triangle order. Kelp2016→900vertices, coral10584→4284, fish486→120. Expanded-index reconstruction asserted exact. Actual capture before/after indexing99.8358% pixel-identical, mean difference.001277 RGB levels.
-- Native historical24 Frame37.51ms/p9585.03,71draws;27 Frame53.51/p9595.86,78draws. Retained53 capture profile42.240ms/p9592.376; final full playtest42.732ms/p9591.408,78draws. Current controller PASS: W5.033m,boost8.955m(1.779x),rise3.663m,orbit1.635rad. Frozen state unchanged;32/3.7M pixels max7levels changed, stability PASS. Full current evidence pass53/verification.json/playtest.json/swimming.png/orbit.png. Browser53 actual1280×720 canvas:600RAF samples,18.952FPS,52.763ms mean/p95100.1ms. Roughly19–20FPS on this laptop;30FPS UNMET. No native/browser console warnings/errors; Bob build/bundle zero issues. Evidence artifacts/progress/pass53/browser-opening.png/browser-opening-metrics.json and browser-moving.png/browser-moving-metrics.json. Click canvas before keyboard tests: verified W movedz4→1.54, frozen false. Test renderers closed after validation; localserver8765 stays available.
+Retained work: broader pointed fins with clean concave topology and filtered veins; larger head/scalp; lower arms and flowing locks; rotated connected arcade, deeper column fluting, all 11 required column regions present; olive grass with three corrected roots; blue rock/floor materials, height-based bottom-water haze, foreground stone volume with local bevel detail. Native pass87: 24.0ms mean / 24.5ms p95, 78 draws. Previous slow profiles overlapped CPU-heavy fitting; do not attribute them solely to rock bevels.
 
-## Geometry presence audit
+Retained layout now includes broader columns and a deeper right ledge group, with its plants/collision moved together to expose the orange school. The right mid-terrace trial (43,-42, height13.5) is retained. Current material work is calibrating rock ambient/direct response independently (pass94 baseline; later calibration captures are temporary and restore neutral gains automatically). Latest validated browser build remains pass53, about 19 FPS; rebuild and validate current web output before reporting browser performance.
 
-- `mermaid.lighting {mode:5}` renders actual visible column/arch/window geometry WHITE, all other visible geometry/water BLACK, preserving depth occlusion. No fog/post color. Restore mode0 afterwards. Debug IDs are vertex alpha: columns.1, arches.2, ring.3 under stone params0; normal output stays OPAQUE alpha1.
-- `tools/reference_structure.json`:11 coarse hand-marked required-column regions. `tools/structure_check.py` rejects ordinary colored captures, checks visible area/vertical span. It is a presence audit, not proof of correct silhouette/detail; neighboring masonry can overlap boxes. Inspect mask and normal capture too.
-- Added/corrected real main/left pair/behind-main/ring-left/right-rear columns and temple lintel. Stable landmark GO names/transforms: `assets/source/landmarks.json`.
-- Current audit still flags `left_distant_pillar`, `left_distant_pillar_pair`, `central_distant_pillar` as missing/occluded. Do not hide this by fog/color adjustment. Their visibility/placement is a later isolated geometry task.
+## Produce a diff
 
-## Run, capture, compare
+From the project directory:
 
 ```bash
 python3 tools/capture_diff.py
-python3 tools/capture_diff.py --output artifacts/progress/pass33 --profile
+```
+
+No required arguments. Reuses/starts Defold, builds and runs the native game, freezes the opening at time 3, captures the scene and architecture mask, exits the game, and compares against the reference. The editor stays open.
+
+Outputs in `artifacts/image-diff/`:
+
+- `diff.png`: reference and capture above one RGB difference panel.
+- `metrics.json`: scores, settings and regional diagnostics.
+- `capture.png`, `capture.json`: actual framebuffer and frozen state.
+- `structure-mask.png`, `structure.json`: visible architecture audit.
+
+For a separate checkpoint and native profiling:
+
+```bash
+python3 tools/capture_diff.py --output artifacts/progress/pass56 --profile
+```
+
+The comparison uses fixed 960px analysis width and LANCZOS resizing, with no alignment, cropping, warping or color correction. Exact equality is black; larger RGB error is brighter under a fixed square-root display curve. The 10-level tolerance score is reported separately and never thresholds the difference image. `--max-mae-percent 4` optionally gates MAE only; exit codes are 0 for workflow success, 1 for failed MAE gate, 2 for an error.
+
+## Working rules and next work
+
+- Fit **one visual element per pass**. Freeze camera, pose/time and unrelated settings; inspect a real capture before proceeding.
+- Keep real 3D geometry and independent shared-mesh actors. No reference backdrops, projections or actor baking. Inspect swimming and orbit views too.
+- Main remaining mismatches: foreground/midground rock shape and placement, vegetation, character and architecture. Do not count blue water as missing blue geometry.
+- All 11 architecture regions pass as of pass79. The coarse audit checks presence, not silhouette accuracy; inspect the normal capture too.
+- Unsupported coral `(-9,9,-20)` and sponge `(-11,4.5,-11)` remain. Three prominent grass roots were seated on measured ledges. Raycast support before moving plants; helper: `artifacts/progress/check_support.py` (extend its mesh filter for `rock3_detail` if querying the new block).
+- Preserve existing work. Commit each verified improvement that is retained. Historical experiments and measurements remain in `artifacts/progress/`.
+
+## Build assets and validate
+
+```bash
+python3 tools/build_assets.py
 python3 -m unittest tools.test_image_diff tools.test_structure_check -q
 python3 tools/playtest.py
 ```
 
-- NO required arguments. Reuse/start editor → build/run native → ready → freeze openingtime3 → warm30frames → normal capture → semantic architecture mask/audit → exit engine → ONE RGB diff PNG. Editor stays open. Engine cleanup also runs on failure.
-- Default output `artifacts/image-diff/`: `capture.png`+`capture.json`, debug `structure-mask.png`+`structure.json`, **ONE difference** `diff.png`, `metrics.json`. Mask/capture are source/debug evidence, not extra diffs. No HTML/overlay/extra heatmap.
-- Diff PNG top=reference+game side by side; bottom=one grayscale RGB RMS error. Inputs NOT converted to grayscale: delta=(refRGB-gameRGB)/255; error=sqrt(mean(delta²)); displayed gray=round(255*sqrt(error)). Fixed curve, exact-equal black; larger error brighter. Never threshold/normalize/grade the diff to satisfy the target.
-- Fixed960px analysis width, strict aspect within.5%, LANCZOS resize. No alignment/crop/warp/color fitting. Diff bottom enlarged2x NEAREST. Normal1920×1760 review sheet.
-- `black_pixels_percent` is exact RGB equality after fixed analysis. `within_tolerance_pixels_percent` means EVERY channel differs≤10/255; easier intermediate milestone, never changes error pixels. Changed-pixel metric is a different historical measure(mean RGB error>10). MAE=mean absolute RGB error/255; RGB SSIM7×7/sample covariance; blur diagnostic only.
-- Optional `--reference`, `--output`, `--max-mae-percent4`(explicit MAE-only gate), `--profile`(90 Main-thread frames→profile.json). Default0=workflow success,1=explicit MAE gate failed,2=real error. Do not equate workflow success with art acceptance.
--16 known-value tests cover RGB-only color changes, one unblended diff, strict/tolerance separation, aspect, and geometry-vs-blue-water presence checks.
-- Playtest checks capture stability, W/boost/rise/orbit and native profiler. It closes engines it launches; `--attach` only disconnects. Latest frozen repeat showed32pixels(max7levels) changing over3.7M, frozen simulation state unchanged. Stability test allows≤8levels at≤.01%pixels and requires identical frozen state; reports exact equality separately. The reference diff remains STRICT.
+Generator: seed 73, Y-up meters, forward -Z; emits shared GLBs, world layout, collision boxes, manifest and named landmarks. Limit: 2048 model/GO instances. Editable sources: `assets/source/mermaid.blend` and `ruins.blend`. Blender: `/snap/bin/blender`.
 
-## Source and asset authoring
+Finished meshes are cached by raw-mesh/script signature. Manual edits must export to the relevant `*-finished.glb` with material `reef`, vertex colors, normals and UVs; reset ruins display offsets before export. Changing generator geometry or finishing scripts can replace manual exports, so preserve them first.
 
-```bash
-python3 tools/build_assets.py
-```
+Mermaid vertex alpha identifies skin 0, tail .25, fluke .5, hair .75, garment 1. Normal fragment output stays opaque. Swimming, hair and tail deformation currently use the vertex shader. Controls: WASD, Space/E rise, Ctrl/Q dive, Shift boost, mouse drag orbit, R reset, P profiler.
 
-- Deterministic seed73, Y-up meters, forward -Z. Emits shared GLBs/.model/.go, world.collection, obstacles.lua, manifest.json and named landmarks. Current counts in manifest; limits2048model/GO instances.
-- `assets/source/mermaid.blend`: editable current mesh. Raw/finished GLBs + signature cache alongside. `tools/finish_character.py` unions skin(.018voxel), smooths3, decimates.55, rejoins untouched hair/fins/clothing with UV/material IDs. `build_assets.py` runs Blender only if raw mesh/script changes; otherwise copies cached finishedGLB. No armature yet; swimming/hair/tail deformation is in the vertex shader.
-- Mermaid vertex alpha encodes skin0,tail.25,fluke.5,hair.75,garment1; preserve these IDs and active vertex colors when editing/exporting. Normal fragment alpha is ALWAYS1, not the ID.
-- `assets/source/ruins.blend`: column/arch/ring arranged side-by-side for editing. `tools/finish_ruins.py` welds, physically erodes.024, bevels.045/2segments, weighted normals, slight mottling; exports BEFORE display offsets. Finished triangles column5912/arch4626/ring4290. Cached raw/finishedGLBs/signature.
-- Manual Blender edits must export back to the relevant `*-finished.glb`, material `reef`, active vertex color/normals/UVs. For ruins export one object at a time with location reset to0(display offsets are not world placement). Cache uses raw generator/script signature: unchanged generation copies that finished file. Changing raw generator/script regenerates and replaces manual finished mesh, so preserve manual source revisions first.
-- Limestone bitmap/provenance is in assets/textures; reused only this asset from a rejected pass. No old palette fitting/prepass returned. Shared packed caustics texture R=receiving caustics,G=stone noise,B=water wave field.
+`playtest.py` checks frozen stability, swimming, boost, rise, orbit and native profiling. Last complete movement/browser validation: pass53. Latest native frozen profile: pass87, 24.0ms mean, 78 draws. Revalidate current changes separately on native and web.
 
-## Editor/bridge/browser commands
+## Runtime and tooling
 
-- CWD `/home/vlaaad/Projects/mermaid`, Defold1.14.0. Editor `http://127.0.0.1:$(cat .internal/editor.port)`. `.internal/editor.token` is SECRET; never print. Editor/engine/BlenderSnap require execution escalation here. Reuse editor; avoid concurrent editor builds.
-- Blender5.2.2 `/snap/bin/blender`; system Python has Pillow+NumPy. Installed Defold sources/schema: `/opt/Defold/packages/defold-a81dbb0478e8b73931dc2d671563204f6ac0ef82.jar`. Read local API/schema before guessing.
-- Pinned Automation Bridge2.5.0 + managed wrapper automation-bridge-python. Do not edit wrapper. `PYTHONPATH=automation-bridge-python`.
+- Editor HTTP: `http://127.0.0.1:$(cat .internal/editor.port)`. Never print `.internal/editor.token`. Editor/engine/Blender may require sandbox escalation; avoid concurrent builds.
+- Defold 1.14.0; Automation Bridge 2.5.0. Managed wrapper: `automation-bridge-python/`; do not edit it. Set `PYTHONPATH=automation-bridge-python` for direct bridge scripts.
+- Bridge: `editor.open_project('.', start_if_needed=False)`, `build_and_run(focus=True, timeout=180)`, wait for `mermaid.ready`, command `mermaid.capture`. State is `.value`; screenshots use `.read_bytes()`. `close_engine()` exits the engine; `close()` only disconnects.
+- Web bundle: Bob `build,bundle`, platform/architecture `wasm-web`, archive true; output `artifacts/browser/` (outside reserved `build/`). `python3 tools/serve.py` serves port 8765; check for an existing server first.
+- Browser frozen capture: `/?debug=1&capture=1&width=1280`. “Save frame and timings” writes actual browser evidence to `artifacts/scene/`. Click canvas before keyboard input. Browser has no engine bridge HTTP; validate separately with one test renderer active.
 
-```python
-from automation_bridge import editor
-p=editor.open_project('.',start_if_needed=False)
-g=p.build_and_run(focus=True,timeout=180)
-g.wait_for_state('mermaid.ready',True,timeout=45)
-g.command('mermaid.capture',{}) # freeze/reset opening; resume command unfreezes
-state=g.state('mermaid').value # NOT .data
-shot=g.screenshot(after_frames=2,timeout=30)
-# save shot.read_bytes(); g.screen() is actual framebuffer/window evidence
-profile=g.profiler.capture(frames=120,warmup_frames=5,thread='Main',timeout=45)
-g.close_engine(timeout=5) # g.close() alone leaves engine alive
-p.bob(options={'platform':'wasm-web','architectures':'wasm-web','archive':True,'variant':'debug',
-              'bundle-output':str((p.root/'artifacts/browser').resolve())},
-      commands=('build','bundle'),timeout=240)
-```
+## Rendering constraints
 
-- Bob output must be OUTSIDE build/(reserved). Verified destination artifacts/browser/mermaid. Avoid build_and_run_html5 unless necessary; it opens another Firefox instance. Console lines are strings: `p.console.read().lines`; check WARN/ERROR. Bob timeout: inspect console before retrying; operation may still be running.
-- `python3 tools/serve.py` → localhost8765, default Bob bundle. Existing detached server PID/log in artifacts/server.pid/server.log; check health before launching a duplicate.
-- Browser `/?debug=1&capture=1&width=1280`: frozen opening, actual1280×720 canvas, rolling600 RAF samples, renderer, **Save frame and timings** button→same-origin server capture→artifacts/scene/browser.png/browser-metrics.json. These are actual web captures; never substitute native. `?debug=1` live, movement unfreezes, `?trace=1` scopes adds overhead.
-- WebAssembly has no bridge debug HTTP. Use browser UI controls. Canvas locator `.press('w')` reaches controller; Tab.pressKey was unreliable. `display.update_frequency=0` for web RAF. Check native and browser separately with only one agent game renderer active; do not kill user browser processes.
+Opaque depth-tested rendering; no depth prepass or alpha discard. Keep fish, fins, hair and kelp two-sided. Sampled depth attachments require `render.TEXTURE_BIT`; fullscreen glTF UVs need V restored at each render-target lookup.
 
-## Pitfalls, validation and next work
+Geometry/post cap: 1280×720; 1024² shadow map with 4 PCF taps; quarter-resolution 32-step water scattering; depth-aware upsampling. Shared GLBs index complete vertex tuples to preserve seams and normals. Collision substeps ≤25ms and dt cap .1 prevent slow motion under load.
 
-- User rejected7e66368(blue cutout hair/tail/plants); revertc424f31 restored913f1fb. Their later97fcc09 checkpoint is not an accepted art match. Do not reintroduce depth prepass/alpha discard or trust only frozen MAE. Inspect animated frames and camera orbit.
-- Render depth attachments sampled later MUST use flags=render.TEXTURE_BIT and not transient. glTF fullscreen UV imports flippedV: each RT lookup restores V; never repair screenshots afterwards.
-- Keep fish/fins/hair/kelp two-sided. Stone/sand can cull backs. Fixed sponge wall winding before culling; fish fins use thin predicate. All GLB normals unit/colors bounded/no degenerate poles. Explicit Python float serialization prevents numpy repr leaking into Lua collision files.
-- Engine max_time_step.1/controller dtcap.1/collision substeps≤25ms avoid slow motion under load. Controls WASD,Space/E,Ctrl/Q,Shift,drag,R,P. Sphere/AABB sliding and cached broad-phase camera obstruction.
-- Prior hand-outlined extruded cliff experiment21–22 looked like stacked shelves; rejected and removed. Do not restore it. Fuller terrain is current, still wrong relative to art. Earlier long notes preserved locally at artifacts/progress/agent-notes-through-pass32.md; per-pass captures/metrics remain under artifacts/progress/.
-- Sponge-only38→39: moved sponge_1417 from(-10.7,13,-20), actual rock supportY.549, to(-15.5,14.42,-14), rock topY14.582 and nearby samples14.425–14.633. Only this instance changed, scale/yaw/lighting unchanged. Root slightly embedded, closer to reference upper-left ledge.
-- Known moving-view bugs: other unsupported plants remain: coral(-9,9,-20) actualsupportY-2.496; kelp(-11,11,-5) actualsupportY-4.238; sponge(-11,4.5,-11) supportY-4.271. Terrain moves invalidated old placement. Root placement needs explicit supported ledges, not arbitrary screen positions. Artifact check_support.py raycasts actual GLB rock triangles and scene transforms. Seabed rectangle edge FIXED in48; outer strips extend beyond far plane. Fix each as a separate geometry pass.
-- Next: ONE visual element at a time: foreground/midground rock silhouette/position remains a large target; unsupported vegetation roots and remaining column visibility also need correction. Current water/character changes are checkpoints, not acceptance. Recheck coupled lighting quantities without changing several elements at once. Never call the90%/all-black goal achieved while geometry is missing or the normal scene still looks wrong.
+Rejected experiments: hand-extruded cliffs (passes21–22), cutout hair/tail/plants (`7e66368`, reverted), connected outcrop (passes50–51, reverted: worse visuals and 92 draws), `SORT_NONE` (pass52: 97 draws). Do not restore blindly.

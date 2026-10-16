@@ -13,7 +13,8 @@ bpy.ops.object.select_all(action='SELECT')
 bpy.ops.object.delete(use_global=False)
 objects = []
 shared_material = None
-for name in ['column', 'arch', 'ring']:
+names=sys.argv[sys.argv.index('--')+2:] or ['column', 'arch', 'ring', 'gateway_facade']
+for name in names:
     bpy.ops.import_scene.gltf(filepath=str(source/f'{name}-procedural.glb'))
     obj = next(o for o in bpy.context.selected_objects if o.type == 'MESH')
     obj.name = name
@@ -25,10 +26,10 @@ for name in ['column', 'arch', 'ring']:
     # Small physical erosion: preserve overall dimensions, passage clearance and seams.
     for vertex in obj.data.vertices:
         p = vertex.co.copy()
-        amount = noise.noise(p*3.7, noise_basis='PERLIN_ORIGINAL')*.024
+        amount = noise.noise(p*3.7, noise_basis='PERLIN_ORIGINAL')*(.012 if name.startswith('rock') else .024)
         vertex.co += vertex.normal*amount
     bevel = obj.modifiers.new('Worn masonry edges', 'BEVEL')
-    bevel.width=.045;bevel.segments=2;bevel.limit_method='ANGLE';bevel.angle_limit=.65
+    bevel.width=.035 if name.startswith('rock') else .045;bevel.segments=2;bevel.limit_method='ANGLE';bevel.angle_limit=.65
     bpy.ops.object.modifier_apply(modifier=bevel.name)
     for face in obj.data.polygons:face.use_smooth=True
     weighted = obj.modifiers.new('Broad stone face normals', 'WEIGHTED_NORMAL')
@@ -57,4 +58,4 @@ for name in ['column', 'arch', 'ring']:
     print('MASONRY_FINISHED',name,'faces',len(obj.data.polygons),'vertices',len(obj.data.vertices))
 for i,obj in enumerate(objects):obj.location.x=i*12
 bpy.context.preferences.filepaths.save_version=0
-bpy.ops.wm.save_as_mainfile(filepath=str(source/'ruins.blend'))
+bpy.ops.wm.save_as_mainfile(filepath=str(source/('rocks.blend' if names[0].startswith('rock') else 'ruins.blend')))

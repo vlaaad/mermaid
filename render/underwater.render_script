@@ -18,7 +18,7 @@ function init(self)
     self.constants.visual_debug=vmath.vector4()
     self.constants.time_data=vmath.vector4(3,0,0,0)
     self.constants.camera_pos=vmath.vector4(0,7,13,1)
-    self.constants.fog_settings=vmath.vector4(.065,.61,1.0,.016)
+    self.constants.fog_settings=vmath.vector4(0.062500,0.625000,0.945500,.016)
     self.shadow=target(1024,1024,true)
 end
 
@@ -72,7 +72,7 @@ function update(self)
     render.disable_state(graphics.STATE_CULL_FACE)
 
     render.set_render_target(self.target)
-    render.clear({[graphics.BUFFER_TYPE_COLOR0_BIT]=vmath.vector4(.065,.61,1.0,1),[graphics.BUFFER_TYPE_DEPTH_BIT]=1})
+    render.clear({[graphics.BUFFER_TYPE_COLOR0_BIT]=vmath.vector4(0.062500,0.625000,0.945500,1),[graphics.BUFFER_TYPE_DEPTH_BIT]=1})
     render.set_viewport(0,0,rw,rh)
     render.set_view(self.view)
     local projection=vmath.matrix4_perspective(math.rad(59),w/h,.15,400)

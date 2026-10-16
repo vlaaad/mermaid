@@ -19,6 +19,14 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "assets/generated"
 R = random.Random(73)
 STATS = {}
+COLUMN_WIDTH_GAIN = 1.45
+
+
+def column_scale(scale,label):
+    # The three distant columns already have individually fitted widths.
+    if label in {"left_distant_pillar","left_distant_pillar_pair","central_distant_pillar"}:
+        return tuple(scale)
+    return (scale[0]*COLUMN_WIDTH_GAIN,scale[1],scale[2]*COLUMN_WIDTH_GAIN)
 
 
 def vec(p):
@@ -218,10 +226,10 @@ def column():
         lo=.73+drum*1.15
         rings=[]
         for y,r in [(lo,.68),(lo+.08,.72),(lo+1.08,.70),(lo+1.13,.67)]:
-            rings.append([(math.cos(j*math.tau/32)*r*(1+.055*math.cos(j*math.pi)),y,math.sin(j*math.tau/32)*r*(1+.055*math.cos(j*math.pi))) for j in range(32)])
+            rings.append([(math.cos(j*math.tau/64)*r*(1+.10*math.cos(j*math.tau*8/64)),y,math.sin(j*math.tau/64)*r*(1+.10*math.cos(j*math.tau*8/64))) for j in range(64)])
         for i in range(3):
-            for j in range(32):
-                jj=(j+1)%32
+            for j in range(64):
+                jj=(j+1)%64
                 m.quad(rings[i][j],rings[i+1][j],rings[i+1][jj],rings[i][jj],stone)
     m.box((0,7.78,0),(1.65,.4,1.65),stone,.08)
     m.box((0,8.11,0),(2.0,.3,2.0),stone,.1)
@@ -241,6 +249,43 @@ def arch():
             pts.extend([(r*math.cos(t),4.7+r*math.sin(t),z) for r,t in [(1.68,a),(2.73,a),(2.73,b),(1.68,b)]])
         for ids in [(0,3,2,1),(4,5,6,7),(0,1,5,4),(1,2,6,5),(2,3,7,6),(3,0,4,7)]:
             m.quad(*(pts[k] for k in ids),col)
+    return m
+
+
+def gateway_facade():
+    """Connected arcade below the circular window, with a real open passage."""
+    m=arch();stone=(.32,.38,.37)
+    # Solid spandrels follow the outer arch, leaving its opening untouched.
+    # Each strip is an extruded stone wedge; small joints remain visible.
+    for j in range(13):
+        a,b=j*math.pi/13+.012,(j+1)*math.pi/13-.012
+        x0,y0=2.73*math.cos(a),4.7+2.73*math.sin(a)
+        x1,y1=2.73*math.cos(b),4.7+2.73*math.sin(b)
+        pts=[(x0,y0,-.65),(x1,y1,-.65),(x1,8.05,-.65),(x0,8.05,-.65),
+             (x0,y0,.65),(x1,y1,.65),(x1,8.05,.65),(x0,8.05,.65)]
+        for ids in [(0,3,2,1),(4,5,6,7),(0,1,5,4),(1,2,6,5),(2,3,7,6),(3,0,4,7)]:
+            m.quad(*(pts[k] for k in ids),stone)
+    # Left and right buttresses meet the circular wall above, down to the plinth.
+    for x in [-3.14,3.14]:
+        for row in range(8):
+            m.box((x,.48+row*.98,0),(.78,.96,1.65),stone,.06)
+        m.box((x,.12,.04),(1.10,.24,1.90),stone,.06)
+        m.box((x,7.95,.04),(1.08,.36,1.88),stone,.06)
+    m.box((0,8.14,0),(7.15,.32,1.60),stone,.06)
+    # A second, smaller arch shares the same masonry plane on the right.
+    other=arch()
+    for p,n,c,uv in zip(other.p,other.n,other.c,other.uv):
+        m.p.append(vec(p)*.82+vec((6.25,.65,0)))
+        m.n.append(n);m.c.append(c);m.uv.append(uv)
+    for row in range(7):
+        m.box((9.02,1.07+row*.83,0),(.90,.80,1.35),stone,.06)
+    m.box((6.16,7.20,0),(6.30,.34,1.6),stone,.06)
+    # Six broad, worn treads climb from the basin to the sunlit threshold.
+    for j in range(6):
+        top=-1.3+j*.26
+        m.box((0,(top-3.7)*.5,3.95-j*.64),(5.7,top+3.7,.73),stone,.045)
+    # Receiving floor beyond the gate remains real shaded geometry.
+    m.box((0,-.10,-4.65),(6.7,.24,8.0),stone,.055)
     return m
 
 
@@ -360,7 +405,7 @@ def ray():
     for side in [-1,1]:
         def wing(u,v,layer):
             front=-.38*(1-u)+.18*u;back=.42*(1-u)+.18*u
-            return (side*(.10+u*1.45),.03+.17*u**3-.06*math.sin(v*math.pi)*(1-u)+layer*.018*(1-u),front+(back-front)*v)
+            return (side*(.10+u*1.45),.03-.10*u**3-.06*math.sin(v*math.pi)*(1-u)+layer*.018*(1-u),front+(back-front)*v)
         for i in range(12):
             for j in range(8):
                 u0,u1=i/12,(i+1)/12;v0,v1=j/8,(j+1)/8
@@ -380,20 +425,29 @@ def mermaid():
     m.tube([(0,.10,.08),(0,.30,.02),(0,.51,-.05),(0,.74,-.10),(0,.98,-.17),(0,1.20,-.22),(0,1.32,-.23)],
            [(.35,.235),(.32,.205),(.27,.17),(.285,.185),(.36,.225),(.43,.225),(.35,.17)],skin,32)
     m.tube([(0,1.27,-.23),(0,1.59,-.28)],[.135,.12],skin,20)
+    head_start=len(m.p)
     m.ellipsoid((0,1.85,-.29),(.29,.36,.275),skin,20,28)
     m.ellipsoid((0,1.83,-.55),(.038,.06,.055),skin,8,12)
     for side in [-1,1]:
         m.ellipsoid((side*.105,1.92,-.535),(.055,.033,.014),(.92,.94,.87),6,10)
         m.ellipsoid((side*.105,1.92,-.547),(.021,.026,.007),(.035,.19,.22),5,8)
     m.tube([(-.06,1.73,-.54),(0,1.72,-.56),(.06,1.73,-.54)],[.009,.014,.009],(.67,.31,.29),6)
+    # Broader head around the fixed neck; facial details share its transform.
+    head_scale=vec((1.40,1.12,1.25));head_pivot=vec((0,1.48,-.28))
+    for i in range(head_start,len(m.p)):
+        m.p[i]=head_pivot+(m.p[i]-head_pivot)*head_scale
+        n=m.n[i]/head_scale;m.n[i]=n/np.linalg.norm(n)
     # Narrow swimsuit band leaves a readable back and shoulders.
     m.tube([(0,.91,-.15),(0,1.02,-.18),(0,1.12,-.20)],[(.341,.220),(.375,.231),(.415,.23)],(.06,.34,.31),32)
     m.tube([(0,.90,-.15),(0,.925,-.16)],[(.34,.225),(.35,.226)],(.70,.58,.27),24)
     for side in [-1,1]:
         # Open relaxed swimming arms; tapered joints and separate fingers.
-        elbow=(side*.86,.77,-.18 if side<0 else -.28)
-        wrist=(side*1.36,.35,-.28 if side<0 else -.53)
-        m.tube([(side*.39,1.19,-.22),(side*.52,1.04,-.20),elbow,(side*1.1,.55,wrist[2]+.05),wrist],
+        elbow=(-.8483,.3883,-.18) if side<0 else (.9439,.6539,-.28)
+        wrist=(-1.4634,-.0358,-.28) if side<0 else (1.2883,.1668,-.53)
+        shoulder=vec((side*.39,1.19,-.22));elbow=vec(elbow);wrist=vec(wrist)
+        upper=shoulder*.65+elbow*.35
+        forearm=elbow*.48+wrist*.52+vec((0,.025,.01))
+        m.tube([shoulder,upper,elbow,forearm,wrist],
                [.135,.14,.103,.088,.055],skin,18)
         palm=(wrist[0]+side*.035,wrist[1]-.09,wrist[2]-.015)
         m.ellipsoid(palm,(.073,.115,.047),skin,10,14)
@@ -416,40 +470,51 @@ def mermaid():
     def bez(points,t):
         a,b,c,d=[vec(p) for p in points]
         return (1-t)**3*a+3*(1-t)**2*t*b+3*(1-t)*t*t*c+t**3*d
-    for side in [-1,1]:
-        def fin(u,v):
-            if u<.55:
-                edge=bez([(0,-.47,.54),(.20,-.82,.59),(.55,-.70,.20),(.88,-1.08,-.04)],u/.55)
-            else:
-                edge=bez([(.88,-1.08,-.04),(.84,-.66,-.10),(.43,-.08,-.045),(0,0,0)],(u-.55)/.45)
-            offset=vec((side*edge[0]*(1.35 if side<0 else 1.0),edge[1]*(1.60 if side<0 else 1.08),edge[2]+side*edge[0]*.15))
-            angle=-.25
-            offset[0],offset[1]=math.cos(angle)*offset[0]-math.sin(angle)*offset[1],math.sin(angle)*offset[0]+math.cos(angle)*offset[1]
-            # Authored flukes: narrower left lobe, right lobe swept leftward.
-            # Real mesh coordinates, shared by normals and moving/swimming views.
-            if side<0:
-                offset[0]*=.79421564;offset[1]*=1.08874023
-            else:
-                offset[0]+=offset[1]*.37656321;offset[1]*=1.02304932
-            q=fin_root+offset*v
-            q[2]+=.10*math.sin(v*math.pi)*math.sin(u*math.pi)+.018*math.sin(u*math.pi*24)*v*v
-            return q
-        def fn(u,v):
-            u=max(.0001,min(.9999,u));v=max(.0001,min(.9999,v))
-            n=np.cross(fin(u+.001,v)-fin(u-.001,v),fin(u,v+.001)-fin(u,v-.001))
-            return n/max(np.linalg.norm(n),1e-8)
-        for i in range(28):
-            for j in range(10):
-                u0,u1=i/28,(i+1)/28;v0,v1=j/10,(j+1)/10
-                uv=[(u0,v0),(u1,v0),(u1,v1),(u0,v1)]
-                pts=[fin(*q) for q in uv];ns=[fn(*q) for q in uv]
-                col=(.18+.45*v1,.38+.38*v1,.65+.07*v1,.5)
-                for ids in ([0,1,2],[0,2,3]):m.tri(*(pts[k] for k in ids),col,normals=[ns[k] for k in ids])
-        for i in range(1,18):
-            u=i/19
-            m.tube([fin(u,v) for v in [.06,.25,.5,.75,.95]],[.0038,.0036,.003,.002,.0008],(.34,.69,.64,.5),5)
+    # Broad swept blades with a pointed tip and shared central notch.
+    # Control points are authored in local 3D; no runtime camera fitting.
+    fin_outlines=[[(-0.2029609, -0.5339884, 0.0), (-0.3500026, -0.8167358, 0.0), (-1.0727819, -0.9370315, 0.0), (-1.1831819, -1.4896789, 0.0), (-1.4683785, -0.9622137, 0.0), (-0.9074737, -0.2468607, 0.0), (-0.0, -0.0, 0.0)], [(-0.2029609, -0.5339884, 0.0), (-0.4006291, -1.0588396, 0.0), (0.4596894, -0.9368352, 0.0), (0.030918, -1.3849056, 0.0), (0.9043836, -0.8096483, 0.0), (0.6855373, 0.028877, 0.0), (-0.0, -0.0, 0.0)]]
+    for side,outline in zip([-1,1],fin_outlines):
+        # Ear clipping respects the deep trailing-edge notch; a root fan overlaps
+        # this concave blade and produces self-shadowing triangles.
+        boundary=[vec(fin_root)+bez(outline[:4],i/28) for i in range(28)]
+        boundary += [vec(fin_root)+bez(outline[3:],i/28) for i in range(29)]
+        def cross2(a,b,c):
+            x,y=b[:2]-a[:2];u,v=c[:2]-a[:2]
+            return x*v-y*u
+        area=sum(a[0]*b[1]-b[0]*a[1] for a,b in zip(boundary,boundary[1:]+boundary[:1]))
+        if area<0:boundary.reverse()
+        remaining=list(range(len(boundary)));triangles=[]
+        while len(remaining)>3:
+            for j,index in enumerate(remaining):
+                before,after=remaining[j-1],remaining[(j+1)%len(remaining)]
+                a,b,c=[boundary[k] for k in [before,index,after]]
+                if cross2(a,b,c)<=1e-10:continue
+                if any(cross2(a,b,boundary[k])>=-1e-10 and cross2(b,c,boundary[k])>=-1e-10 and cross2(c,a,boundary[k])>=-1e-10 for k in remaining if k not in [before,index,after]):continue
+                triangles.append((a,b,c));remaining.pop(j);break
+            else:raise ValueError('Fin outline cannot be triangulated')
+        triangles.append(tuple(boundary[k] for k in remaining))
+        def surface(p):
+            p=p.copy();x,y=p[:2]-fin_root[:2]
+            p[2]+=.075*math.sin(x*1.6)*math.sin(-y*1.8)
+            dzdx=.12*math.cos(x*1.6)*math.sin(-y*1.8)
+            dzdy=-.135*math.sin(x*1.6)*math.cos(-y*1.8)
+            n=vec((-dzdx,-dzdy,1));n/=np.linalg.norm(n)
+            v=min(1.0,math.hypot(x,y)/1.45)
+            u=math.atan2(x,-y)/math.pi+.5
+            return p,n,(u,v),(.18+.45*v,.38+.38*v,.65+.07*v,.5)
+        def emit(a,b,c,depth):
+            if depth:
+                ab=(a+b)*.5;bc=(b+c)*.5;ca=(c+a)*.5
+                for tri in [(a,ab,ca),(ab,b,bc),(ca,bc,c),(ab,bc,ca)]:emit(*tri,depth-1)
+                return
+            points=[surface(p) for p in [a,b,c]];start=len(m.p)
+            m.tri(*(q[0] for q in points),points[0][3],uv=[q[2] for q in points],normals=[q[1] for q in points])
+            if len(m.p)==start+3:
+                for j,q in enumerate(points):m.c[start+j]=q[3]
+        for tri in triangles:emit(*tri,2)
     # Hair hugs the whole rear scalp, then separates into broad wavy locks.
     hair=(.84,.66,.36)
+    scalp_start=len(m.p)
     for i in range(15):
         for j in range(28):
             def scalp(ii,jj):
@@ -463,16 +528,19 @@ def mermaid():
                 ns.append(n/np.linalg.norm(n))
             uv=[(j/28,i/19),(j/28,(i+1)/19),((j+1)/28,(i+1)/19),((j+1)/28,i/19)]
             for ids in ([0,1,2],[0,2,3]):m.tri(*(pts[k] for k in ids),(*tuple(c*(1+.025*math.sin(j*3.3)) for c in hair),.75),uv=[uv[k] for k in ids],normals=[ns[k] for k in ids])
+    for i in range(scalp_start,len(m.p)):
+        m.p[i]=head_pivot+(m.p[i]-head_pivot)*head_scale
+        n=m.n[i]/head_scale;m.n[i]=n/np.linalg.norm(n)
     hr=random.Random(184)
     for lock in range(30):
-        rootx=hr.uniform(-.26,.27); rooty=hr.uniform(1.55,1.86); rootz=hr.uniform(-.08,.05)
+        rootx=hr.uniform(-.26,.27); rooty=hr.uniform(1.23,1.83); rootz=hr.uniform(-.08,.05)
         length=hr.uniform(1.1,1.95); phase=hr.random()*math.tau
         width=hr.uniform(.17,.23) if lock<8 else (hr.uniform(.055,.11) if lock<20 else hr.uniform(.018,.045))
         centers=[]
         for j in range(18):
             t=j/17
-            centers.append((rootx-math.sin(t*math.pi/2)*(.50+length*.42)+math.sin(t*10+phase)*.20*math.sin(t*math.pi),
-                            rooty-t**1.12*length*.75+math.sin(t*8+phase)*.20*t,
+            centers.append((rootx-math.sin(t*math.pi/2)*(.50+length*.42)+math.sin(t*10+phase)*.26*math.sin(t*math.pi),
+                            rooty-t**1.12*length*.75+math.sin(t*8+phase)*.26*t,
                             rootz+(1-math.cos(t*math.pi/2))*length*.57+math.sin(t*7+phase)*.18*t))
         shade=hr.uniform(.90,1.10)
         m.tube(centers,[(width*(.6+.6*math.sin(math.pi*j/17))*(1-j/17)**.50+.001,.055*(1-j/17)**.7+.001) for j in range(18)],(*tuple(c*shade for c in (.84,.66,.37)),.75),10)
@@ -506,28 +574,36 @@ def finish_character():
 
 
 
-def finish_ruins():
+def finish_stone_meshes(names,kind):
     """Preserve editable Blender sources and cache finished shared architectural meshes."""
     source=ROOT/'assets/source';source.mkdir(exist_ok=True)
-    names=['column','arch','ring'];script=ROOT/'tools/finish_ruins.py';cache=source/'ruins-build.json'
+    script=ROOT/'tools/finish_ruins.py';cache=source/f'{kind}-build.json'
     raw={name:(OUT/f'{name}.glb').read_bytes() for name in names}
     signature=hashlib.sha256(b''.join(raw.values())+script.read_bytes()).hexdigest()
     cached=json.loads(cache.read_text()) if cache.exists() else {}
     if cached.get('signature')!=signature or not all((source/f'{name}-finished.glb').exists() for name in names):
         for name,data in raw.items():(source/f'{name}-procedural.glb').write_bytes(data)
-        subprocess.run([shutil.which('blender') or '/snap/bin/blender','--background','--python',str(script),'--',str(source)],check=True)
-        cache.write_text(json.dumps({'signature':signature,'method':'physical erosion .024; bevel .045 two segments; weighted normals'},indent=2)+'\n')
+        subprocess.run([shutil.which('blender') or '/snap/bin/blender','--background','--python',str(script),'--',str(source),*names],check=True)
+        cache.write_text(json.dumps({'signature':signature,'method':('physical erosion .012; bevel .035 two segments; weighted normals' if kind=='rocks' else 'physical erosion .024; bevel .045 two segments; weighted normals')},indent=2)+'\n')
     for name in names:
         finished=source/f'{name}-finished.glb';shutil.copyfile(finished,OUT/f'{name}.glb')
         data=finished.read_bytes();n=struct.unpack_from('<I',data,12)[0];doc=json.loads(data[20:20+n])
         triangles=sum(doc['accessors'][p['indices']]['count']//3 if 'indices' in p else doc['accessors'][p['attributes']['POSITION']]['count']//3 for mesh in doc['meshes'] for p in mesh['primitives'])
-        STATS[name]={'triangles':triangles,'bytes':len(data),'source':'assets/source/ruins.blend'}
+        STATS[name]={'triangles':triangles,'bytes':len(data),'source':f'assets/source/{kind}.blend'}
+
+
+def finish_ruins():
+    finish_stone_meshes(['column','arch','ring','gateway_facade'],'ruins')
+
+def finish_foreground_stone():
+    finish_stone_meshes(['rock3_detail'],'rocks')
 
 
 def main():
     OUT.mkdir(parents=True,exist_ok=True)
     for i in range(4): make_rock(100+i).save(f'rock{i}')
-    for name,mesh,part_id in [('column',column(),.1),('arch',arch(),.2),('ring',ring_ruin(),.3)]:
+    make_rock(103).save('rock3_detail')
+    for name,mesh,part_id in [('column',column(),.1),('arch',arch(),.2),('ring',ring_ruin(),.3),('gateway_facade',gateway_facade(),.2)]:
         # Debug semantic ID only. Normal output stays opaque; no lighting baked in.
         mesh.c=[(*c[:3],part_id) for c in mesh.c]
         mesh.save(name)
@@ -608,11 +684,18 @@ def main():
 
     objects=[]; obstacles=[]
     placements=0
-    def place(asset,p,scale=(1,1,1),yaw=0,collision=False,pitch=0,roll=0,label=None):
+    def place(asset,p,scale=(1,1,1),yaw=0,collision=False,pitch=0,roll=0,label=None,depth_scale=1):
         nonlocal placements
         name=label or f'{asset}_{placements:04d}'
         placements+=1
         if isinstance(scale,(int,float)):scale=(scale,)*3
+        if asset=='column':scale=column_scale(scale,label)
+        # Authored depth of a supported terrace group. This is a fixed world
+        # transform; it preserves the opening silhouette and changes parallax.
+        if depth_scale!=1:
+            opening_camera=vec((-.4,6.519904,12.992801))
+            p=opening_camera+(vec(p)-opening_camera)*depth_scale
+            scale=tuple(float(v)*depth_scale for v in scale)
         def multiply(a,b):
             ax,ay,az,aw=a;bx,by,bz,bw=b
             return (aw*bx+ax*bw+ay*bz-az*by,aw*by-ax*bz+ay*bw+az*bx,aw*bz+ax*by-ay*bx+az*bw,aw*bw-ax*bx-ay*by-az*bz)
@@ -625,20 +708,32 @@ def main():
             obstacles.append([round(float(v),3) for v in [*p,*extent]])
         if asset=='column':
             obstacles.append([p[0],p[1]+4.2*scale[1],p[2],.76*scale[0],4.2*scale[1],.76*scale[2]])
-        elif asset=='arch':
-            for side in [-1,1]:
-                obstacles.append([p[0]+side*2.2*scale[0],p[1]+2.5*scale[1],p[2],.56*scale[0],2.5*scale[1],.67*scale[2]])
-            obstacles.append([p[0],p[1]+7*scale[1],p[2],2.5*scale[0],.6*scale[1],.67*scale[2]])
+        elif asset in ('arch','gateway_facade'):
+            boxes=[(side*2.2,2.5,0,.56,2.5,.67) for side in [-1,1]]
+            boxes += [(0,7,0,2.5,.6,.67)]
+            if asset=='gateway_facade':
+                boxes += [(x,4,0,.42,4,.83) for x in [-3.14,3.14]]
+                boxes += [(x,3.35,0,.50,3.4,.68) for x in [4.45,8.05,9.02]]
+                boxes += [(6.25,6.3,0,2.5,.65,.68),(0,-.10,-4.65,3.35,.12,4)]
+                for j in range(6):
+                    top=-1.3+j*.26
+                    boxes.append((0,(top-3.7)*.5,3.95-j*.64,2.85,(top+3.7)*.5,.365))
+            co,si=math.cos(yaw),math.sin(yaw)
+            for x,y,z,ex,ey,ez in boxes:
+                x,z=x*scale[0],z*scale[2];ex,ez=ex*scale[0],ez*scale[2]
+                obstacles.append([p[0]+co*x+si*z,p[1]+y*scale[1],p[2]-si*x+co*z,abs(co)*ex+abs(si)*ez,ey*scale[1],abs(si)*ex+abs(co)*ez])
         elif asset=='ring':
             for j in range(22):
                 a=(j+.5)*math.tau/22
-                obstacles.append([p[0]+math.cos(a)*4.05*scale[0],p[1]+math.sin(a)*4.05*scale[1],p[2],.62*scale[0],.62*scale[1],.55*scale[2]])
+                x=math.cos(a)*4.05*scale[0];co,si=math.cos(yaw),math.sin(yaw)
+                ex,ez=.62*scale[0],.55*scale[2]
+                obstacles.append([p[0]+co*x,p[1]+math.sin(a)*4.05*scale[1],p[2]-si*x,abs(co)*ex+abs(si)*ez,.62*scale[1],abs(si)*ex+abs(co)*ez])
     place('seabed',(0,0,0))
     place('surface',(0,0,0))
     # An open, stepped archaeological basin: irregular islands, not parallel walls.
     # Every platform has foundations down to the seabed, and actors stay independent.
     terrain_rng=random.Random(391)
-    def terrace(cx,cz,rx,rz,height,tiers=3):
+    def terrace(cx,cz,rx,rz,height,tiers=3,depth_scale=1):
         for tier in range(tiers):
             top=-4+(height+4)*(tier+1)/tiers
             footprint=1-.30*tier/max(tiers-1,1)
@@ -653,19 +748,19 @@ def main():
                     sz=rz*.31*footprint*terrain_rng.uniform(.88,1.18)
                     thickness=(height+4)/tiers+terrain_rng.uniform(.2,.7)
                     cell_top=top+terrain_rng.uniform(-.40,.40)
-                    place(f'rock{terrain_rng.randrange(4)}',(x,cell_top-thickness*.5-.12,z),(sx,thickness,sz),terrain_rng.uniform(-.30,.30),True,pitch=terrain_rng.uniform(-.09,.09),roll=terrain_rng.uniform(-.07,.07))
+                    place(f'rock{terrain_rng.randrange(4)}',(x,cell_top-thickness*.5-.12,z),(sx,thickness,sz),terrain_rng.uniform(-.30,.30),True,pitch=terrain_rng.uniform(-.09,.09),roll=terrain_rng.uniform(-.07,.07),depth_scale=depth_scale)
                     if tier==tiers-1 and terrain_rng.random()<(.24 if abs(cx)>14 else .035):
-                        place('kelp',(x,cell_top+.1,z),terrain_rng.uniform(.65,1.35),terrain_rng.random()*math.tau)
+                        place('kelp',(x,cell_top+.1,z),terrain_rng.uniform(.65,1.35),terrain_rng.random()*math.tau,depth_scale=depth_scale)
                     if tier==tiers-1 and terrain_rng.random()<.30:
-                        place(terrain_rng.choice(['sponge','coral_pink','coral_blue']),(x,cell_top+.12,z),terrain_rng.uniform(.55,1.25))
+                        place(terrain_rng.choice(['sponge','coral_pink','coral_blue']),(x,cell_top+.12,z),terrain_rng.uniform(.55,1.25),depth_scale=depth_scale)
     # Left foreground reaches above the camera; it ends rather than continuing as a wall.
     terrace(-20,-12,6.7,9,14,7)
     terrace(-22,-37,9,10,8,5)
     terrace(-30,-59,12,14,13,5)
     # Right shelf is farther away and opens onto a much wider temple plaza.
-    terrace(27,-12,8,9,7,4)
-    terrace(40,-42,14,13,15,5)
-    terrace(46,-73,15,15,15,5)
+    terrace(27,-12,8,9,7,4,depth_scale=1.5)
+    terrace(43,-42,14,13,13.5,5)
+    terrace(58,-73,15,15,15,5)
     # Low isolated stepping platforms give a visible scale change with distance.
     terrace(3.0,-42,3.0,3.2,-.2,2)
     terrace(-7,-43,5.0,4.5,5,4)
@@ -689,12 +784,12 @@ def main():
     def at(u,v,depth):
         return camera+forward*depth+right*((u-.5)*2*(16/9)*depth/f)+upward*((.5-v)*2*depth/f)
     landmark_records=[]
-    def landmark(asset,u,v,depth,scale,label=None):
+    def landmark(asset,u,v,depth,scale,label=None,yaw=0):
         p=at(u,v,depth)
-        place(asset,p,scale,label=label)
+        place(asset,p,scale,yaw=yaw,label=label)
         if label:
             landmark_records.append({'id':label,'asset':asset,'reference_anchor_uv':[u,v],
-                                     'world_position':[float(x) for x in p],'scale':list(scale),'depth_m':depth})
+                                     'world_position':[float(x) for x in p],'scale':list(column_scale(scale,label) if asset=='column' else scale),'depth_m':depth,'yaw_radians':yaw})
         return p
     # Broken intermediate shelves occupy the basin rather than a broad bare floor.
     for u,v,d,rx,rz,tiers in [(.29,.55,35,4.5,4.0,4),(.37,.59,29,3.1,3.5,4),
@@ -711,8 +806,8 @@ def main():
     # Required faint structures are actual stone meshes even when blue haze
     # makes their RGB difference small. Never count blue background as a column.
     for label,u,v,d,scale in [
-        ('left_distant_pillar',.347,.48,69,(.65,1.12,.65)),
-        ('left_distant_pillar_pair',.375,.48,76,(.6,1.35,.6)),
+        ('left_distant_pillar',.347,.48,60,(1.35,.974,1.35)),
+        ('left_distant_pillar_pair',.375,.48,66,(.80,1.172,.80)),
         ('central_distant_pillar',.465,.51,82,(.4,1.0,.4)),
         ('pillar_behind_main',.624,.44,61,(.82,1.50,.82)),
         ('ring_left_pillar',.646,.43,64,(.85,2.14,.85)),
@@ -726,12 +821,13 @@ def main():
     gateway=at(.536,.555,58)
     terrace(float(gateway[0]),float(gateway[2]),3.4,2.8,float(gateway[1])-.1,3)
     landmark('arch',.536,.555,58,(.83,.90,.83),'central_gateway')
-    landmark('arch',.701,.515,66,(1.55,1.55,1.55),'ring_gateway')
-    landmark('ring',.701,.245,66,(1.5,1.5,1.5),'circular_window')
+    landmark('gateway_facade',.701,.495,66,(1.75,1.55,1.55),'ring_gateway',yaw=.35)
+    landmark('ring',.701,.245,66,(1.5,1.5,1.5),'circular_window',yaw=.35)
     # Square wall supports continue down to the temple shelf, leaving the arch open.
     ring=at(.701,.245,66)
     for side in [-1,1]:
-        for row in range(5):place('rock1',(ring[0]+side*6.2,7.6+row*2.6,ring[2]),(1.15,2.7,1.1),0,True)
+        # The connected arcade supplies these piers. Keep later instance IDs stable.
+        placements+=5
     for x in [34,46]:place('column',(x,15,-67),(1.55,3.65,1.55))
     place('rock0',(40,45.5,-67),(10.5,1.1,2))
     place('column',(43,12,-81),(1.25,2.8,1.25))
@@ -739,9 +835,13 @@ def main():
     place('column',(-4,0,-99),(.8,1.55,.8))
     place('column',(8,5,-114),(1.1,2.1,1.1))
     place('arch',(14,3,-118),(1.1,1.1,1.1))
+    # These supported shelf actors share a fixed authored depth transform.
+    ledge_depth_scale={p:1.5 for p in [
+        (15,1.2,-7),(13,3,-5),(14.4,3.1,-7),(12,3,-9),
+    ]}
     # Foreground plants frame the view without forming a wall of broad leaves.
-    for p,scale in [((-8,1,5),1.3),((-7.8,3,-7),1.5),((-11,11,-5),1.3),((13,3,-5),1.6),((18,7,-19),1.5),((-4,-4,-22),1.3),((14,-4,-36),1.4)]:
-        place('kelp',p,scale,R.random()*math.tau)
+    for p,scale in [((-9.2,1.30,.3),1.3),((-7.8,4.06,-7),.8),((-14.8,14.40,-14),1.3),((13,3,-5),1.6),((19,6.85,-13),1.5),((-4,-4,-22),1.3),((14,-4,-36),1.4)]:
+        place('kelp',p,scale,R.random()*math.tau,depth_scale=ledge_depth_scale.get(p,1))
     # Reference-specific foreground shelves, coral and plants. Fixed 3D positions.
     for asset,p,scale,yaw in [
         ('rock1',(-8.5,.15,-1),(3.0,2.4,2.6),.12),
@@ -752,7 +852,7 @@ def main():
         ('rock2',(15,1.2,-7),(4.0,3.7,3.6),.22),
         ('rock1',(7.4,-1.4,-19),(2.8,4.5,2.8),.18),
         ('rock3',(-2.4,-2.1,-17),(1.7,2.4,1.8),-.2),
-    ]:place(asset,p,scale,yaw,True)
+    ]:place(asset,p,scale,yaw,True,depth_scale=ledge_depth_scale.get(p,1))
     for asset,p,scale in [
         ('sponge',(-9.5,2.1,-2),1.0),('coral_pink',(-7.5,1.5,-1.5),1.2),
         ('coral_blue',(-7,3.5,-9),.95),('sponge',(-11,4.5,-11),1.1),
@@ -760,9 +860,9 @@ def main():
         ('sponge',(13,-1.6,-1.5),2.2),('coral_pink',(14.4,3.1,-7),1.4),
         ('coral_blue',(12,3,-9),1.2),('sponge',(7.8,.9,-19),1.1),
         ('coral_pink',(-2.5,-.9,-17),.8),('sponge',(2.0,-3.7,-14),.9),
-    ]:place(asset,p,scale,R.random()*math.tau)
+    ]:place(asset,p,scale,R.random()*math.tau,depth_scale=ledge_depth_scale.get(p,1))
     for p,scale in [((-8,1.5,-1),.95),((-7,3.5,-8),1.2),((10,1,-3),1.3),((7.6,.9,-19),1.0),((-4.5,-1.8,-12),1.1)]:
-        place('kelp',p,scale,R.random()*math.tau)
+        place('kelp',p,scale,R.random()*math.tau,depth_scale=ledge_depth_scale.get(p,1))
     for u,v,depth,scale in [(-.08,1.02,14,(2.8,1.35,1.4)),(.18,.85,22,1.45),(.26,.54,40,1.5),(.35,.61,46,1.5),(.72,1.02,16,.75),(.86,.60,45,1.6)]:
         place('ribbon_kelp',at(u,v,depth),scale,R.random()*.5)
     # Reference kelp has irregular clusters of narrow fronds at different depths.
@@ -796,7 +896,7 @@ def main():
         c=at(*uv,depth)
         for k in range(count):
             place(asset,c+vec((R.gauss(0,spread[0]),R.gauss(0,spread[1]),R.gauss(0,spread[2]))),R.uniform(.35,.65),.1)
-    for u,v,depth,scale,yaw in [(.335,.155,36,2.5,-.5),(.46,.225,57,1.8,.3)]:
+    for u,v,depth,scale,yaw in [(.317,.155,36,2.3,-.5),(.46,.225,57,1.8,.3)]:
         target=at(u,v+.012,depth);p=target.copy()
         # Solve only the initial actor translation; local wing motion stays live.
         for _ in range(12):
@@ -804,8 +904,13 @@ def main():
             jac=np.array([[1,2*math.cos(.51+p[2])],[-.45*math.sin(.69+p[0]),1]])
             step=np.linalg.solve(jac,residual)
             p[0]-=step[0];p[2]-=step[1]
-        place('ray',p,scale,yaw)
+        place('ray',p,scale,math.pi/2,pitch=.10,roll=-.15 if u<.4 else -.10)
     for k in range(65):place('particle',(R.uniform(-15,15),R.uniform(1,22),R.uniform(-55,10)),R.uniform(.5,1.6))
+    # A supported foreground block beside the open swimming channel. This is
+    # a full volume with a buried foundation, not a screen-facing silhouette.
+    outcrop_top=at(.55,.85,20)
+    rock_top=max(p[1] for p in make_rock(103).p)
+    place('rock3_detail',outcrop_top-vec((0,rock_top*3.7,0)),(2.10,3.7,1.80),.12,True,label='foreground_outcrop')
     # Remove only obsolete outputs from the abandoned mesh-baking experiment.
     for stale in list(OUT.glob('ruins_chunk_*')) + [OUT/(n+ext) for n in ('fish_field','fish_blue_field','dust_field') for ext in ('.glb','.model','.go')]:
         if stale.suffix in ('.glb','.model','.go') and stale.exists():stale.unlink()
@@ -814,6 +919,8 @@ def main():
     (ROOT/'main/obstacles.lua').write_text('return '+json.dumps([[float(v) for v in box] for box in obstacles],separators=(',',':')).replace('[','{').replace(']','}')+'\n')
     finish_character()
     finish_ruins()
+    # Detailed stone only for the foreground block; terrace meshes stay light.
+    finish_foreground_stone()
     STATS['world']={"instances":len(objects),"source_placements":placements,"collision_boxes":len(obstacles),"seed":73}
     (OUT/'manifest.json').write_text(json.dumps(STATS,indent=2)+'\n')
     print(json.dumps(STATS,indent=2))

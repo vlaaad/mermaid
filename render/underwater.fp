@@ -20,6 +20,8 @@ uniform fs_uniforms {
 // One-variable fitting pass: caustic contribution only.
 const float CAUSTIC_GAIN=.90;
 const float STONE_CAUSTIC_RESPONSE=.35;
+const vec3 ROCK_AMBIENT_GAIN=vec3(1.000000,1.000000,1.000000);
+const vec3 ROCK_SUN_GAIN=vec3(1.000000,1.000000,1.000000);
 float visibility(vec3 p,vec3 normal,float ndl) {
     if(abs(light_matrix[3].w)<.0001)return 1.0;
     vec4 light=light_matrix*vec4(p+normal*.025,1.0);
@@ -75,10 +77,13 @@ vec3 surfaceColor(float t) {
     return shaded*vec3(.53,.78,.994);
 }
 vec3 fogged(vec3 shaded,float density,bool surface) {
+    // Suspended sediment makes water near the basin floor more turbid.
+    // This follows world height in every camera view, including orbit/swimming.
+    density*=1.0+(1.0-smoothstep(-3.0,7.0,var_world.y))*.90;
     float blend=1.0-exp(-max(var_depth-3.0,0.0)*density);
     vec3 ray=normalize(var_world-camera_pos.xyz);
     vec3 sun=normalize(vec3(.35,.90,-.24));
-    vec3 fog=mix(vec3(.050,.49,.86),fog_settings.rgb,clamp(ray.y*.9+.42,0.0,1.0));
+    vec3 fog=mix(vec3(0.061000,0.485000,0.875000),fog_settings.rgb,clamp(ray.y*.9+.42,0.0,1.0));
     fog+=vec3(.012,.035,.04)*pow(max(dot(ray,sun),0.0),5.0);
     if(surface)blend=max(blend,smoothstep(165.0,300.0,var_depth));
     return mix(shaded,fog,blend);
@@ -99,6 +104,8 @@ void main() {
     if(!gl_FrontFacing && params.x>.5 && params.x<1.5)n=-n;
     vec3 sun=normalize(vec3(.35,.90,-.24));
     float diffuse=max(dot(n,sun),0.0);
+    // Bias a thin fin toward the light on either side to avoid self-shadow acne.
+    if(params.x>2.5 && params.x<3.5 && var_color.a>.37 && var_color.a<.62 && dot(geometric,sun)<0.0)geometric=-geometric;
     float shadow=visibility(var_world,geometric,diffuse);
     float t=time_data.x;
     // Refraction projects a larger pattern onto receiving surfaces, absent in shade.
@@ -111,9 +118,14 @@ void main() {
     vec3 ambient=mix(vec3(.13,.25,.34),vec3(.40,.59,.68),sky);
     // Broad bounced sand light gives undersides a cool green fill.
     ambient+=vec3(.10,.19,.14)*(1.0-sky)*exp(-max(var_world.y,0.0)*.085);
+    bool roughStone=params.x<.5 && var_color.a>.4 && var_color.b>var_color.r && var_color.r<.4 && var_color.b<.55;
     vec3 base=var_color.rgb;
+    // Blue-grey limestone reflectance; coral, sand and actors stay unchanged.
+    if(params.x<.5 && base.b>base.r && base.r<.4 && base.b<.55)base*=var_color.a>.4?vec3(.49,.39,.69):vec3(.68,.57,.86);
+    // The column shafts use a cooler limestone palette than the surrounding rock.
+    if(params.x<.5 && var_color.a<.15)base*=vec3(.50,1.08,1.45);
     // Sand reflectance only; keep the projected caustic contribution fixed.
-    if(params.x>7.5)base*=.90;
+    if(params.x>7.5)base*=vec3(.675,1.035,1.215);
     if(params.x<.5 && base.b>base.r && base.r<.4) {
         vec3 weights=pow(abs(n),vec3(5.0));
         weights/=max(dot(weights,vec3(1.0)),.00001);
@@ -128,7 +140,10 @@ void main() {
     }
     diffuse=max(dot(n,sun),0.0);
     float weather=sin(var_world.x*1.3+sin(var_world.z*1.1))*sin(var_world.y*2.4+var_world.z*.8);
-    vec3 shaded=base*(ambient+vec3(1.38,1.26,.77)*diffuse*shadow)*(.95+weather*.05);
+    vec3 materialAmbient=ambient;
+    vec3 sunlight=vec3(1.38,1.26,.77);
+    if(roughStone) { materialAmbient*=ROCK_AMBIENT_GAIN;sunlight*=ROCK_SUN_GAIN; }
+    vec3 shaded=base*(materialAmbient+sunlight*diffuse*shadow)*(.95+weather*.05);
     float causticResponse=params.x>7.5?1.0:STONE_CAUSTIC_RESPONSE;
     shaded+=vec3(.78,.88,.53)*pattern*(max(n.y,0.0)*.65+diffuse*.35)*shadow*CAUSTIC_GAIN*causticResponse;
     if(params.x<.5 && (base.r>.45 || base.b>.55))shaded+=base*.18;
@@ -137,6 +152,7 @@ void main() {
         float leafLight=.30+.70*abs(dot(n,sun));
         shaded=base*(vec3(.30,.46,.23)+vec3(1.85,1.65,.60)*leafLight*shadow);
         shaded+=base*vec3(.42,.58,.22)*transmission*shadow*.7;
+        shaded*=vec3(1.12,.78,.88); // Olive fronds retain warm edges and cool shaded faces.
     }
     if(params.x>1.5 && params.x<2.5) {
         shaded=base*(vec3(.60,.65,.48)+vec3(.75,.79,.53)*diffuse*shadow);
@@ -146,7 +162,7 @@ void main() {
         float rim=pow(1.0-max(dot(n,view),0.0),3.0);
         vec3 fill=vec3(.62,.61,.55),direct=vec3(.86,.86,.74);
         if(var_color.a>.12 && var_color.a<.62) {fill=vec3(.38,.61,.69);direct=vec3(.70,.86,.87);}
-        if(var_color.a>.37 && var_color.a<.62) {fill=vec3(.45,.50,.38);direct=vec3(.65,.70,.55);}
+        if(var_color.a>.37 && var_color.a<.62) {fill=vec3(.48,.55,.55);direct=vec3(.65,.70,.55);}
         shaded=base*(fill+direct*diffuse*shadow);
         shaded+=vec3(.32,.48,.35)*rim*.40*shadow;
         vec3 halfVector=normalize(view+sun);
@@ -154,6 +170,11 @@ void main() {
         shaded+=vec3(.35,.42,.32)*spec*.18;
         shaded+=vec3(.18,.37,.32)*pattern*.13*shadow;
         if(var_color.a>.37 && var_color.a<.62) {
+            float phase=var_uv.x*44.0;
+            float distanceToVein=abs(fract(phase+.5)-.5);
+            float width=max(fwidth(phase),.025);
+            float vein=(1.0-smoothstep(.025,.025+width,distanceToVein))*smoothstep(.02,.12,var_uv.y);
+            shaded=mix(shaded,shaded*vec3(.65,.95,1.20)+vec3(.025,.07,.10),vein*.65);
             shaded+=base*vec3(.10,.08,.03);
             shaded*=1.5; // Thin fin light response only; body/hair stay fixed.
         }
