@@ -203,10 +203,10 @@
     }
   },
   "seabed": {
-    "triangles": 12782,
-    "vertices": 38346,
-    "unindexed_vertices": 38346,
-    "bytes": 1995244
+    "triangles": 20800,
+    "vertices": 62400,
+    "unindexed_vertices": 62400,
+    "bytes": 3246052
   },
   "surface": {
     "triangles": 26912,

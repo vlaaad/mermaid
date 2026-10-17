@@ -17,6 +17,7 @@ function init(self)
     self.thin=render.predicate({"reefthin"})
     self.rigid=render.predicate({"rigid"})
     self.surface=render.predicate({"surface"})
+    self.debug_text=render.predicate({"debug_text"})
     self.skinned=render.predicate({"skinned"})
     self.bubbles=render.predicate({"bubbles"})
     self.casters={}
@@ -230,6 +231,14 @@ function update(self)
     render.draw(self.blit,{constants=self.constants})
     render.disable_material()
     render.disable_texture("scene_texture")
+
+    render.set_view(vmath.matrix4())
+    render.set_projection(vmath.matrix4_orthographic(0,w,0,h,-1,1))
+    render.enable_state(graphics.STATE_BLEND)
+    render.set_blend_func(graphics.BLEND_FACTOR_SRC_ALPHA,graphics.BLEND_FACTOR_ONE_MINUS_SRC_ALPHA)
+    render.draw(self.debug_text)
+    render.disable_state(graphics.STATE_BLEND)
+
 
 end
 

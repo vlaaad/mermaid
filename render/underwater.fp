@@ -91,6 +91,13 @@ void main() {
     if(!gl_FrontFacing && params.x>2.5 && params.x<3.5 && var_color.a>.37 && var_color.a<.62)n=-n;
     vec3 sun=normalize(vec3(.35,.90,-.24));
     float diffuse=max(dot(n,sun),0.0);
+    if(params.x>7.5 && var_color.a<.5 && visual_debug.x<4.5) {
+        // Unreachable outer ridges: no close-detail texture or shadow fetches.
+        // Keep the same world-depth attenuation and haze as the rest of the sea.
+        vec3 shaded=var_color.rgb*(vec3(.16,.26,.35)+vec3(.45,.61,.67)*diffuse);
+        out_fragColor=vec4(fogged(shaded,fog_settings.w),1.0);
+        return;
+    }
     if(params.x>.5 && params.x<1.5 && dot(geometric,sun)<0.0)geometric=-geometric;
     // Bias a thin fin toward the light on either side to avoid self-shadow acne.
     if(params.x>2.5 && params.x<3.5 && var_color.a>.37 && var_color.a<.62 && dot(geometric,sun)<0.0)geometric=-geometric;

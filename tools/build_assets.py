@@ -652,6 +652,7 @@ def main():
     sea_animals.export_routes(ROOT)
     mermaid().save('mermaid','mermaid')
     bathymetry.mesh(Mesh).save('seabed','sand')
+    assert STATS['seabed']['vertices']<=65535, 'Seabed exceeds browser model index limit'
     bathymetry.export_collision(ROOT/'main/seafloor.lua')
     water_surface().save('surface','surface')
     particle=Mesh()

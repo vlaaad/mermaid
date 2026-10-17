@@ -75,7 +75,7 @@ Mermaid vertex alpha identifies skin 0, tail .25, fluke .5, hair .75, garment 1.
 - Defold 1.14.0; Automation Bridge 2.5.0. Managed wrapper: `automation-bridge-python/`; do not edit it. Set `PYTHONPATH=automation-bridge-python` for direct bridge scripts.
 - Bridge: `editor.open_project('.', start_if_needed=False)`, `build_and_run(focus=True, timeout=180)`, wait for `mermaid.ready`, command `mermaid.capture`. State is `.value`; screenshots use `.read_bytes()`. `close_engine()` exits the engine; `close()` only disconnects.
 - Web bundle: Bob `build,bundle`, platform/architecture `wasm-web`, archive true; output `artifacts/browser/` (outside reserved `build/`). `python3 tools/serve.py` serves port 8765; check for an existing server first.
-- Browser frozen capture: `/?debug=1&capture=1&width=1280`. “Save frame and timings” writes actual browser evidence to `artifacts/scene/`. Click canvas before keyboard input. Browser has no engine bridge HTTP; validate separately with one test renderer active.
+- Browser frozen capture: `/?debug=1&capture=1&width=1280`. F9 writes actual browser evidence to `artifacts/scene/`. Press F9 with the canvas focused to save development evidence. Browser has no engine bridge HTTP; validate separately with one test renderer active.
 
 ## Rendering constraints
 
@@ -166,7 +166,7 @@ Final native 1280×720 verification measured 50.13ms mean / 103.06ms p95 over 12
 
 ## Living world and deep landmarks
 
-Normal desktop and browser play has no text, labels, buttons or loading overlay. Click to steer, W to swim, Shift to boost and Tab to release still work; controls remain documented here.
+Normal desktop play has no text, labels, buttons or loading overlay. Browser play adds only a fullscreen icon and an invisible performance toggle; touch regions have no visible controls. Click to steer, W to swim, Shift to boost and Tab to release still work; controls remain documented here.
 
 `tools/rig_assets.py` exports actual glTF skins, inverse bind matrices, two-bone vertex weights and sampled joint tracks. The mermaid has 21 joints through the spine, chest, head, shoulders, elbows, wrists, tail, separate flukes and four-part hair chain. A vertical dolphin stroke travels down the body and tail, with sculling arms, delayed wrists and hair follow-through. Smoothed speed selects swim, glide or idle actions with 0.55s transitions; cadence follows thrust. Heading has angular inertia, turns induce banking, and released thrust coasts rather than stopping abruptly. Fish have three-joint tail rigs. Plants have five-joint rooted stem chains. These are skeletal poses uploaded by Defold, with shared skinning code for visible, depth and shadow passes. Static geometry keeps its separate rigid vertex path. Editable armatures/actions are saved as `assets/source/*-rig.blend` by `tools/save_living_rigs.py`.
 
@@ -225,3 +225,33 @@ Run `python3 tools/check_world.py`, the existing 23 rig/route/image/structure un
 Final native checks report no script or graphics errors. Actual sampled surface depth changes between both wave phases (top-region mean differences 4.24 and 1.68 RGB levels in the depth diagnostic), confirming vertex displacement reaches the MSAA depth path. All three live-school samples have zero body overlaps or stone penetration; nearest-neighbor p10 remains about 1.29–1.30m. The final 1280×720 live sample measures **67.77ms mean / 130.97ms p95**, averaging 98.02 draws, compared with the preceding 65.66ms / 128.14ms checkpoint. Timing varies, and the HD530 30 FPS target remains unmet.
 
 The final WebGL build has no build issues or runtime warnings/errors. Actual input tests climb to the sunlit surface and descend to the lower sanctuary, with the new plants and schools visible. The saved frozen 1280×720 sample measures **12.72 FPS / 78.65ms mean / 153.80ms p95** over 600 RAF samples, compared with the preceding 13.52 FPS / 73.98ms sample. Live moved views read about 10–12 FPS; the added detail has a small measured cost rather than a speedup. Browser evidence is in `artifacts/level-polish/browser/`; native preview is restored afterward.
+
+
+## Distant basin terrain
+
+Nine uneven massifs and escarpments extend the seabed beyond the playable ruins and basin. Their centers lie roughly 160–370m from the opening, with broken crests, lower saddles and open channels between them. They stay below the water surface and use the existing depth-dependent extinction, so the land reads as distant blue silhouettes. They are fixed world geometry with ordinary parallax.
+
+The relief is part of the existing seabed model. A coarse 16m outer grid replaces the previous almost-flat outer skirt; the inner collision triangles keep their 4m spacing. The mesh has 20,800 triangles, up from 12,788, with no new instance or draw call. Opaque vertex alpha marks distant faces for broad sun/ambient lighting and normal haze, skipping close caustic/detail textures and shadow fetches. Nearby terrain, actors and their lighting retain their existing path.
+
+Every sampled reachable floor point, including a body margin, is unchanged. The complete whale route envelopes also have zero terrain-height change. The exported terrain has no interior open edges; physics-table vertex heights match the visible mesh within 0.0000043m. All 49 architecture supports, 376 rooted actors and 1,256 rock/foundation hulls still pass; the existing 23 tests pass. Evidence: `artifacts/distant-terrain/geometry.json` and the world audit. `tools/distant_terrain_check.py` captures the opening, west/east/north/south views and two deep-basin directions, then profiles live native rendering.
+
+Native inspection confirms the ridges are visible through the haze from all four directions and above the deep basin. No build/runtime warnings or errors occur. Live native 1280×720 profiling measures **65.91ms mean / 124.81ms p95**, with **98 draws**, versus the previous 67.77ms / 130.97ms sample and 98.02 draws. These runs vary; this is comparable cost rather than a speedup claim, and the HD530 30 FPS target remains unmet. Evidence: `artifacts/distant-terrain/native/`.
+
+
+## Web controls and browser floor compatibility
+
+The expanded seabed initially exceeded the browser backend's 16-bit model-index limit and was rejected entirely. The outer grid now uses 16m spacing: **62,400 vertices / 20,800 triangles**, below 65,536. Asset generation and the terrain check explicitly guard this limit. Nearby floor geometry, roots and collision remain intact.
+
+Holding a finger on the left half supplies forward thrust in the current 3D aim direction. Swiping the right half changes yaw and pitch. Defold's `TOUCH_MULTI` binding and `main/touch_controls.lua` own these controls; contact roles stay fixed until release, simultaneous fingers work independently, and source-tagged emulated mouse events are ignored. Cancellation, focus loss and resize clear the touch state. Keyboard and mouse controls remain available.
+
+The invisible top-right input region in `main/game_ui.lua` toggles **Defold's built-in profiler** in its compact frame/draw-call view, with a wall-clock FPS and milliseconds-per-frame line drawn through the engine's debug-text path. The invisible control creates no GUI component, node, texture or button drawing. The explicitly allowed fullscreen button lives in the browser shell, just to the left; it enters/exits fullscreen and resizes the canvas with the correct aspect ratio. There is no HTML profiling overlay or HTML movement/steering handler. The shell contains browser startup, canvas sizing, fullscreen API integration and explicit development capture plumbing.
+
+Five Lua tests exercise independent hold/swipe contacts, release/cancel behavior, portrait scaling, the actual game input handler, emulated-mouse rejection, keyboard coexistence and tapping the invisible profiler corner while thrust remains held. Run the existing tests plus `python3 -m unittest tools.test_touch_controls -q` (28 total). Physical multi-touch hardware is not available to the browser automation session; these tests exercise the real Lua handler with multi-contact packets.
+
+Browser development captures now use **F9** while `?debug=1` is present. They save the real game canvas (including the engine profiler when enabled) and timing/state evidence to `artifacts/scene/`. No development capture button is drawn in HTML or in the game.
+
+The final compatible terrain and Lua controls pass native keyboard swimming (speed 4.38m/s) and log no warnings or errors. Final native 1280×720 profiling measures **65.15ms mean / 127.05ms p95**, with **98 draws** while profiling information is hidden. Evidence: `artifacts/distant-terrain/final-native/` and `final-performance/`.
+
+Final browser inspection confirms the restored sand floor, readable in-game FPS text, the invisible corner toggling profiling on/off, and HTML fullscreen entering/exiting correctly. The profiler is enabled synchronously through Defold’s profiler API; its minimized view retains resource counters. No runtime warnings/errors were logged. Screenshot evidence: `artifacts/distant-terrain/browser/final-profiler/`.
+
+The development F9 capture queues a microtask at the end of the current engine frame, before WebGL discards its backbuffer; scheduling the copy in the next animation frame produced black captures. Final on/off PNGs were inspected and contain the actual rendered scene. Timing samples in these UI-check captures include toggling the profiler and are not isolated performance benchmarks.

@@ -5,6 +5,21 @@ from pathlib import Path
 X=list(range(-160,165,4))
 Z=list(range(-200,101,4))
 
+# Broken, asymmetric basin shoulders beyond the swimming area. The gaps leave
+# open water between massifs instead of surrounding the ruins with a box wall.
+# x, z, footprint radii, height above the abyss, rotation
+DISTANT_RIDGES=[
+    (-194,-40,43,115,118,-.16),
+    (-174,-169,49,63,122,-.40),
+    (-72,-242,89,42,117,.14),
+    (73,-251,74,43,123,-.19),
+    (202,-104,47,109,120,.21),
+    (151,151,76,42,113,-.25),
+    (-87,155,89,48,119,.16),
+    (-286,81,52,86,116,-.32),
+    (283,-236,74,61,124,.42),
+]
+
 def smooth(a,b,t):
     t=max(0,min(1,(t-a)/(b-a)))
     return t*t*(3-2*t)
@@ -16,7 +31,19 @@ def height(x,z):
     drop=24*smooth(0,.50,edge)+54*smooth(.65,1.60,edge)
     ripples=.13*math.sin(x*.3)*math.cos(z*.19)
     deep=2.0*math.sin(x*.055)*math.cos(z*.045)*smooth(.8,1.6,edge)
-    return -4.25-drop+ripples+deep
+    base=-4.25-drop+ripples+deep
+    # Keep all swimming routes, ruins supports and habitat floors intact.
+    outside=max((-142-x)/24,(x-145)/24,(-192-z)/24,(z-100)/24,0)
+    if outside<=0:return base
+    relief=0
+    for cx,cz,rx,rz,rise,angle in DISTANT_RIDGES:
+        co,si=math.cos(angle),math.sin(angle);dx=x-cx;dz=z-cz
+        u=(co*dx+si*dz)/rx;v=(-si*dx+co*dz)/rz
+        q=u*u+v*v
+        if q>=1:continue
+        crest=.84+.09*math.sin(x*.073+z*.031)+.05*math.sin(z*.139-x*.087)+.02*math.cos(x*.223+z*.173)
+        relief=max(relief,rise*(1-q)**.70*crest)
+    return base+relief*smooth(0,1,outside)
 
 def mesh_height(x,z):
     x0=math.floor(x/4)*4;z0=math.floor(z/4)*4
@@ -26,13 +53,21 @@ def mesh_height(x,z):
 
 def mesh(mesh_type):
     ground=mesh_type()
-    xs=[-600,*X,600];zs=[-600,*Z,600]
+    # Preserve the exact 4m inner triangles used by collision; spend only a
+    # coarse 16m grid on the distant silhouettes. Stay below 65,536 vertices:
+    # the browser graphics backend requires 16-bit model index buffers.
+    xs=[-600,*range(-320,-160,16),*X,*range(176,337,16),600]
+    zs=[-600,*range(-328,-200,16),*Z,*range(116,341,16),600]
     for z,zz in zip(zs,zs[1:]):
         for x,xx in zip(xs,xs[1:]):
             a,b,c,d=[(px,height(px,pz),pz) for px,pz in [(x,z),(x,zz),(xx,zz),(xx,z)]]
             slope=max(abs(b[1]-a[1])/max(zz-z,1),abs(d[1]-a[1])/max(xx-x,1))
             rock=smooth(.4,1.4,slope)
             color=tuple(s*(1-rock)+r*rock for s,r in zip((.19,.42,.48),(.14,.25,.31)))
+            distant=not (-142<=(x+xx)*.5<=145 and -192<=(z+zz)*.5<=100)
+            # Alpha is an opaque material marker, not transparency. Distant
+            # relief needs only broad lighting and the normal water extinction.
+            if distant:color=(.10,.19,.25,0)
             ground.quad(a,b,c,d,color)
     return ground
 

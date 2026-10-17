@@ -3,6 +3,9 @@ local obstacles = require "main.obstacles"
 local collision = require "main.collision"
 local life = require "main.life"
 local currents = require "main.currents"
+local touch_controls = require "main.touch_controls"
+local game_ui = require "main.game_ui"
+local socket = require "socket"
 local function clamp(v,a,b) return math.max(a,math.min(b,v)) end
 local function smooth(rate,dt) return 1-math.exp(-rate*dt) end
 local function wrap(a) return (a+math.pi)%(math.pi*2)-math.pi end
@@ -19,6 +22,9 @@ local function reset(self,freeze)
     self.frozen=freeze or false
     self.keys={}
     self.taps={}
+    self.touch=touch_controls.new()
+    self.ui_contacts={}
+    self.ui_mouse=false
     self.pose_speed=0
     self.speed=0
     self.turn_rate=0
@@ -66,7 +72,7 @@ local function camera_obstruction(anchor,arm,b)
 end
 
 local function state(self)
-    return {ready=self.frames>30,frozen=self.frozen,time=self.time,speed=self.speed,position={x=self.position.x,y=self.position.y,z=self.position.z},camera={x=self.camera.x,y=self.camera.y,z=self.camera.z},yaw=self.yaw,pitch=self.pitch,tilt=self.tilt,heading=self.heading,bank=self.bank,turn_rate=self.turn_rate,steering=self.steering or window.get_mouse_lock(),captured=window.get_mouse_lock(),depth=50-self.position.y,frames=self.frames,frame_ms=self.frame_ms,last_input=self.last_input or "none"}
+    return {ready=self.frames>30,frozen=self.frozen,time=self.time,speed=self.speed,position={x=self.position.x,y=self.position.y,z=self.position.z},camera={x=self.camera.x,y=self.camera.y,z=self.camera.z},yaw=self.yaw,pitch=self.pitch,tilt=self.tilt,heading=self.heading,bank=self.bank,turn_rate=self.turn_rate,steering=self.steering or window.get_mouse_lock(),captured=window.get_mouse_lock(),depth=50-self.position.y,frames=self.frames,frame_ms=self.frame_ms,last_input=self.last_input or "none",touch_forward=self.touch.forward,touch_looking=self.touch.look_id~=nil}
 end
 
 function init(self)
@@ -78,6 +84,7 @@ function init(self)
     self.frames=0
     self.publish_timer=0
     self.frame_ms=0
+    self.profiling=false
     if html5 then
         self.frozen=html5.run("String(new URLSearchParams(location.search).has('capture'))")=="true"
     end
@@ -105,19 +112,42 @@ function init(self)
     window.set_listener(function(_,event)
         if event==window.WINDOW_EVENT_FOCUS_LOST then
             window.set_mouse_lock(false);self.dragging=false;self.steering=false;self.keys={};self.taps={}
+            touch_controls.reset(self.touch)
+            self.ui_contacts={};self.ui_mouse=false
+        elseif event==window.WINDOW_EVENT_RESIZED then
+            touch_controls.reset(self.touch)
+            self.ui_contacts={};self.ui_mouse=false
         end
     end)
     print("MERMAID_READY seed=73; click to steer; mouse aim; W swim; S reverse; Shift boost; Tab release; A/D strafe; Space/Q rise/dive; R reset")
 end
 
 function update(self,dt)
+    if self.profiling then
+        local now=socket.gettime()
+        if self.profile_last then
+            local elapsed=now-self.profile_last
+            if elapsed>0 and elapsed<.5 then
+                self.profile_elapsed=self.profile_elapsed+elapsed;self.profile_frames=self.profile_frames+1
+                if self.profile_elapsed>=.25 then
+                    self.profile_fps=self.profile_frames/self.profile_elapsed
+                    self.profile_elapsed=0;self.profile_frames=0
+                end
+            end
+        end
+        self.profile_last=now
+        if self.profile_fps then
+            local _,h=window.get_size()
+            msg.post('@render:','draw_debug_text',{text=string.format('%.1f FPS  |  %.1f ms/frame',self.profile_fps,1000/self.profile_fps),position=vmath.vector3(16,h-44,0),color=vmath.vector4(.9,1,.85,1)})
+        end
+    end
     local raw_dt=dt
     dt=math.min(dt,.1)
     self.frames=self.frames+1
     self.frame_ms=self.frame_ms+(raw_dt*1000-self.frame_ms)*.06
     local k=self.keys
     local function down(key) local id=hash(key) return (k[id] or (self.taps[id] or 0)>0) and 1 or 0 end
-    local forward=down("forward")-down("back")
+    local forward=math.max(down("forward"),self.touch.forward and 1 or 0)-down("back")
     -- Embedded browsers may refuse pointer lock. Keep relative mouse aiming,
     -- and allow unlimited turns by holding the cursor near an edge while
     -- thrusting. The normal captured mouse path never uses edge steering.
@@ -238,6 +268,34 @@ function update(self,dt)
 end
 
 function on_input(self,id,action)
+    if id==hash("multitouch") then
+        local width,height=window.get_size()
+        local contacts,events=game_ui.filter_touches(self.ui_contacts,action.touch or {},width,height)
+        for _,role in ipairs(events) do game_ui.activate(self,role) end
+        local dx,dy=touch_controls.apply(self.touch,contacts,math.max(1,width),math.max(1,height))
+        self.yaw=self.yaw-dx*4.096
+        self.pitch=clamp(self.pitch+dy*2.16,-1.48,1.48)
+        if self.touch.forward or dx~=0 or dy~=0 then self.frozen=false;self.started=true;self.last_input="touch" end
+        if window.get_mouse_lock() then window.set_mouse_lock(false) end
+        self.dragging=false;self.steering=false;self.edge_yaw=0;self.edge_pitch=0
+        return true
+    end
+    -- Touch may also generate mouse actions. Only the multi-touch packet owns
+    -- these gestures; emulated clicks must not capture/rotate the mouse.
+    if action.source==hash("touch") then return true end
+    if id==hash("touch") and action.pressed then
+        local w,h=window.get_size()
+        local role=game_ui.hit(action.screen_x or action.x,action.screen_y or action.y,w,h)
+        if role then self.ui_mouse=true;game_ui.activate(self,role);return true end
+    end
+    if self.ui_mouse and action.source~=hash("keyboard") then
+        if action.released then self.ui_mouse=false end
+        return true
+    end
+    if id==hash("capture_frame") and action.pressed and html5 then
+        html5.run("if(window.mermaidCapture)window.mermaidCapture();")
+        return true
+    end
     local locked=window.get_mouse_lock()
     if locked~=self.mouse_was_locked then
         if not locked and self.mouse_was_locked then self.steering=false end

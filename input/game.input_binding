@@ -3,6 +3,8 @@ mouse_trigger {
   action: "touch"
 }
 mouse_trigger { input: MOUSE_BUTTON_2 action: "look" }
+touch_trigger { input: TOUCH_MULTI action: "multitouch" }
+key_trigger { input: KEY_F9 action: "capture_frame" }
 key_trigger { input: KEY_W action: "forward" }
 key_trigger { input: KEY_S action: "back" }
 key_trigger { input: KEY_A action: "left" }
