@@ -270,3 +270,8 @@ Actual debug and release WebGL checks show live movement after fullscreen, hidde
 An initial all-platform manual-filter check measured 86.45ms mean / 160.35ms p95 at 98.02 draws on native HD530. That implementation was replaced with the native fast path above; intermediate evidence remains in `artifacts/web-fixes/native/`.
 
 Final native verification passes MSAA target recreation, keyboard thrust (4.38m/s) and runtime error checks. With the preserved hardware-linear path, the 120-frame native sample measures **87.17ms mean / 165.95ms p95**, averaging **98.04 draws**. A same-session comparison using the original fragment/blur shaders measures **87.46ms / 167.61ms**, averaging **98.03 draws**. This supports comparable native cost; earlier 65ms samples used different machine load and are not a speed comparison. The HD530 30 FPS target remains unmet. Evidence: `artifacts/web-fixes/native-fast/` and `native-baseline/`.
+
+
+## GitHub Pages release
+
+The live game is [https://vlaaad.github.io/mermaid/](https://vlaaad.github.io/mermaid/). GitHub Pages serves `main` → `/docs`. With the Defold editor project open, run `python3 tools/build_pages.py` to build the archived `wasm-web` release and copy its files into `docs/`. Commit and push the generated directory along with source changes. `.nojekyll` keeps Pages from processing the static game assets; engine, WASM and archive URLs resolve relative to the project subdirectory.

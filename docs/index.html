@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Atlantis · Mermaid</title>
+<link rel="preload" as="fetch" crossorigin href="mermaid_wasm.js">
+<link rel="preload" as="fetch" crossorigin href="mermaid.wasm">
+<style>
+*{box-sizing:border-box}[hidden]{display:none!important}html,body{margin:0;width:100%;height:100%;overflow:hidden;overscroll-behavior:none;background:#071e2e}body{display:grid;place-items:center}
+#app-container{position:relative}#canvas{display:block;width:100%;height:100%;outline:none;touch-action:none;user-select:none;-webkit-user-select:none}#canvas-container{width:100%;height:100%}
+#fullscreen{position:absolute;top:max(12px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));width:44px;height:44px;display:grid;place-items:center;padding:11px;border:1px solid #dcf8ff44;border-radius:10px;color:#e4f9ff;background:#082a3b66;cursor:pointer;touch-action:manipulation}
+#fullscreen:hover,#fullscreen:focus-visible{background:#082a3bcc;border-color:#dcf8ff99}
+#app-container:fullscreen #fullscreen{display:none}
+#app-container:-webkit-full-screen #fullscreen{display:none}
+#fullscreen svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+#fullscreen[aria-pressed="false"] .collapse,#fullscreen[aria-pressed="true"] .expand{display:none}
+</style>
+</head>
+<body>
+<main id="app-container"><div id="canvas-container"><canvas id="canvas" tabindex="0" width="1280" height="720" aria-label="Underwater Atlantis game"></canvas></div><button id="fullscreen" type="button" aria-label="Enter fullscreen" title="Enter fullscreen" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="expand" d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6"/><path class="collapse" d="M3 9h6V3m6 0v6h6M9 21v-6H3m12 6v-6h6"/></svg></button></main>
+<script src="dmloader.js"></script>
+<script>
+// Browser bootstrap, canvas sizing and the explicitly requested fullscreen
+// button. Movement, steering and the invisible profiler toggle live in Lua.
+const query=new URLSearchParams(location.search);
+CUSTOM_PARAMETERS.resize_window_callback=function(){
+ const fill=!!(document.fullscreenElement||document.webkitFullscreenElement)||matchMedia('(pointer:coarse), (max-width:900px)').matches;
+ const w=fill?innerWidth:Math.min(innerWidth,innerHeight*16/9),h=fill?innerHeight:w*9/16;
+ const app=document.querySelector('#app-container'),canvas=document.querySelector('#canvas');
+ app.style.width=w+'px';app.style.height=h+'px';
+ const resolution=Number(query.get('width'))||Math.min(1920,Math.round(w));
+ const rw=Math.max(640,Math.min(1920,resolution)),rh=Math.round(rw*h/w);
+ if(canvas.width!==rw||canvas.height!==rh){canvas.width=rw;canvas.height=rh;}
+};
+CUSTOM_PARAMETERS.update_progress=()=>{};
+CUSTOM_PARAMETERS.start_error=e=>console.error('Unable to enter Atlantis:',e);
+if(query.has('trace'))CUSTOM_PARAMETERS.engine_arguments.push('--config=profiler.performance_timeline_enabled=1');
+CUSTOM_PARAMETERS.engine_arguments.push('--config=display.update_frequency=0');
+// DEFAULT moment samplers use nearest in WebGL; shaders reconstruct their
+// filtering. Other scene samplers declare their own explicit filtering.
+CUSTOM_PARAMETERS.engine_arguments.push('--config=graphics.default_texture_min_filter=nearest','--config=graphics.default_texture_mag_filter=nearest');
+const canvas=document.querySelector('#canvas');
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+document.addEventListener('keydown',e=>{if(e.target===canvas&&['Space','ArrowUp','ArrowDown'].includes(e.code))e.preventDefault();});
+document.addEventListener('fullscreenchange',()=>requestAnimationFrame(CUSTOM_PARAMETERS.resize_window_callback));
+document.addEventListener('webkitfullscreenchange',()=>requestAnimationFrame(CUSTOM_PARAMETERS.resize_window_callback));
+const fullscreenButton=document.querySelector('#fullscreen'),app=document.querySelector('#app-container');
+fullscreenButton.hidden=!(app.requestFullscreen||app.webkitRequestFullscreen);
+function syncFullscreen(){
+ const active=!!(document.fullscreenElement||document.webkitFullscreenElement);
+ fullscreenButton.hidden=active||!(app.requestFullscreen||app.webkitRequestFullscreen);
+ fullscreenButton.setAttribute('aria-pressed',String(active));
+ fullscreenButton.setAttribute('aria-label',active?'Exit fullscreen':'Enter fullscreen');
+ fullscreenButton.title=active?'Exit fullscreen':'Enter fullscreen';
+}
+fullscreenButton.addEventListener('click',async()=>{
+ try{
+  if(document.fullscreenElement||document.webkitFullscreenElement)await (document.exitFullscreen||document.webkitExitFullscreen).call(document);
+  else await (app.requestFullscreen||app.webkitRequestFullscreen).call(app);
+  canvas.focus({preventScroll:true});
+ }catch(e){console.warn('Fullscreen unavailable:',e.message);}
+ syncFullscreen();
+});
+document.addEventListener('fullscreenchange',syncFullscreen);
+document.addEventListener('webkitfullscreenchange',syncFullscreen);
+// Explicit development captures, invoked by the game's F9 input action. There
+// is no HTML profiling overlay, including in development mode.
+if(query.has('debug')){
+ let previous=0,deltas=[],ready=false;
+ function sample(t){
+  if(window.mermaidState?.ready){
+   if(!ready){deltas=[];previous=0;ready=true;}
+   if(previous&&document.visibilityState==='visible'){const dt=t-previous;if(dt>0&&dt<500)deltas.push(dt);if(deltas.length>600)deltas.shift();}
+   previous=t;
+  }
+  requestAnimationFrame(sample);
+ }
+ requestAnimationFrame(sample);
+ // After the engine's current JS frame, before WebGL discards the backbuffer.
+ window.mermaidCapture=()=>queueMicrotask(()=>{
+  const copy=document.createElement('canvas');copy.width=canvas.width;copy.height=canvas.height;copy.getContext('2d').drawImage(canvas,0,0);
+  const sorted=[...deltas].sort((a,b)=>a-b),mean=deltas.reduce((a,b)=>a+b,0)/Math.max(1,deltas.length);
+  const report={png:copy.toDataURL('image/png').split(',')[1],state:window.mermaidState,framebuffer:[canvas.width,canvas.height],raf:{samples:deltas.length,mean_ms:mean,p95_ms:sorted[Math.floor(sorted.length*.95)],fps:1000/mean},captured_at:new Date().toISOString()};
+  fetch('/__capture',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(report)}).catch(e=>console.error('Development capture:',e.message));
+ });
+}
+EngineLoader.load('canvas','mermaid');
+</script>
+</body>
+</html>
