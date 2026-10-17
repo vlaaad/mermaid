@@ -21,6 +21,7 @@ local function reset(self,freeze)
     self.taps={}
     self.pose_speed=0
     self.speed=0
+    self.turn_rate=0
     self.bank=0
     self.tilt=-.45
     self.dragging=false
@@ -65,7 +66,7 @@ local function camera_obstruction(anchor,arm,b)
 end
 
 local function state(self)
-    return {ready=self.frames>30,frozen=self.frozen,time=self.time,speed=self.speed,position={x=self.position.x,y=self.position.y,z=self.position.z},camera={x=self.camera.x,y=self.camera.y,z=self.camera.z},yaw=self.yaw,pitch=self.pitch,tilt=self.tilt,heading=self.heading,steering=self.steering or window.get_mouse_lock(),captured=window.get_mouse_lock(),depth=50-self.position.y,frames=self.frames,frame_ms=self.frame_ms,last_input=self.last_input or "none"}
+    return {ready=self.frames>30,frozen=self.frozen,time=self.time,speed=self.speed,position={x=self.position.x,y=self.position.y,z=self.position.z},camera={x=self.camera.x,y=self.camera.y,z=self.camera.z},yaw=self.yaw,pitch=self.pitch,tilt=self.tilt,heading=self.heading,bank=self.bank,turn_rate=self.turn_rate,steering=self.steering or window.get_mouse_lock(),captured=window.get_mouse_lock(),depth=50-self.position.y,frames=self.frames,frame_ms=self.frame_ms,last_input=self.last_input or "none"}
 end
 
 function init(self)
@@ -135,21 +136,29 @@ function update(self,dt)
     end
     local target_speed=down("boost")==1 and 8.4 or 4.4
     local input=vmath.length_sqr(desired)>0
-    self.velocity=vmath.lerp(smooth(input and 4.5 or 3.4,dt),self.velocity,desired*target_speed)
+    self.velocity=vmath.lerp(smooth(input and 3.2 or 1.7,dt),self.velocity,desired*target_speed)
     if vmath.length_sqr(self.velocity)<.0001 then self.velocity=vmath.vector3() end
     self.speed=self.frozen and self.pose_speed or vmath.length(self.velocity)
+    local heading_error=0
     if input and math.abs(desired.x)+math.abs(desired.z)>.00001 then
         local target_heading=forward<0 and self.yaw or math.atan2(-desired.x,-desired.z)
-        self.heading=self.heading+wrap(target_heading-self.heading)*smooth(6,dt)
+        heading_error=wrap(target_heading-self.heading)
     end
+    -- Inertia through the turn; roll leads the change of heading and settles
+    -- during the glide rather than holding one rigid, sideways tilted pose.
+    self.turn_rate=self.turn_rate+(clamp(heading_error*4,-2.5,2.5)-self.turn_rate)*smooth(5,dt)
+    self.heading=self.heading+self.turn_rate*dt
     local swimming=math.min(self.speed/2,1)
     local vertical_aim=self.pitch
+    if not input and self.speed>.2 and not self.frozen then
+        vertical_aim=math.atan2(self.velocity.y,math.sqrt(self.velocity.x*self.velocity.x+self.velocity.z*self.velocity.z))
+    end
     if input and forward>=0 then vertical_aim=math.atan2(desired.y,math.sqrt(desired.x*desired.x+desired.z*desired.z)) end
     -- Her curved authored pose already leans the head-to-fin axis forward by
     -- about .46 radians. Account for that when aligning the rigid model.
     local target_tilt=-.45*(1-swimming)+(vertical_aim-math.pi*.5+.46)*swimming
-    self.tilt=self.frozen and target_tilt or self.tilt+(target_tilt-self.tilt)*smooth(4.5,dt)
-    self.bank=self.bank+(side*-.16-self.bank)*smooth(4,dt)
+    self.tilt=self.frozen and target_tilt or self.tilt+(target_tilt-self.tilt)*smooth(3.2,dt)
+    self.bank=self.bank+(clamp(-self.turn_rate*.16-side*.12,-.38,.38)*swimming-self.bank)*smooth(4,dt)
     -- Resolve the whole newly rotated body, even when steering beside a rock
     -- without translating. Turning cannot rotate the head or fin into stone.
     local cached=self.body_cache

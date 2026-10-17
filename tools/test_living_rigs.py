@@ -33,6 +33,24 @@ class Rigs(unittest.TestCase):
         d=abs(a-b)[fin]
         self.assertGreater(float(np.percentile(np.linalg.norm(d,axis=1),75)),.4)
         self.assertGreater(float(d[:,2].mean()),float(d[:,0].mean())*3)
+    def test_hands_and_hair_have_visible_follow_through(self):
+        g=GLB(ROOT/'assets/generated/mermaid.glb');attrs=g.doc['meshes'][0]['primitives'][0]['attributes']
+        p=g.read(attrs['POSITION']);alpha=g.read(attrs['COLOR_0'])[:,3]
+        frames=np.array([skinned(g,'swim',t) for t in np.linspace(0,1.8,13)])
+        # Select actual palms/fingers and lock tips by anatomy/material, rather
+        # than testing whether animation channels were merely exported.
+        for mask in [(p[:,0]<-1.3)&(alpha<.1),
+                     (p[:,0]>1.24)&(p[:,1]<.2)&(alpha<.1),
+                     (alpha>.62)&(alpha<.87)&(p[:,2]>.85)]:
+            self.assertGreater(int(mask.sum()),100)
+            travel=np.linalg.norm(np.ptp(frames[:,mask,:],axis=0),axis=1)
+            self.assertGreater(float(np.median(travel)),.35)
+        # Head/scalp motion alone cannot account for the locks' displacement.
+        scalp=(alpha>.62)&(alpha<.87)&(p[:,1]>1.8)
+        tips=(alpha>.62)&(alpha<.87)&(p[:,2]>.85)
+        relative=frames[:,tips,:].mean(axis=1)-frames[:,scalp,:].mean(axis=1)
+        self.assertGreater(float(np.linalg.norm(np.ptp(relative,axis=0))),.30)
+
     def test_plant_root_fixed_crown_bends(self):
         for name in ['kelp','ribbon_kelp']:
             g=GLB(ROOT/'assets/generated'/f'{name}.glb');a=skinned(g,'bend',0);b=skinned(g,'bend',1)

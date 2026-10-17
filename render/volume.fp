@@ -79,7 +79,7 @@ void main() {
             energy+=textureLod(solar_flux,aperture+tap,spread).r;
             energy+=textureLod(solar_flux,aperture+tap*3.0,spread).r;
             float flux=.04+energy*1.8;
-            scatter+=sunVisible(p)*flux*(transmission-nextTransmission);
+            scatter+=sunVisible(p)*flux*(transmission-nextTransmission)*exp(-max(4.0-p.y,0.0)*.018);
             transmission=nextTransmission;
             lo=hi;
         }
@@ -88,7 +88,6 @@ void main() {
     float mu=dot(dir,sun),g=.50;
     float phase=(1.0-g*g)/pow(1.0+g*g-2.0*g*mu,1.5);
     float solarTransmission=exp(-max(50.0-camera_pos.y,0.0)*.008/sun.y);
-    solarTransmission*=exp(-max(4.0-camera_pos.y,0.0)*.018);
     vec3 color=vec3(.90,.98,1.0)*scatter*(extinction/combined)*solarTransmission*phase*.14;
     if(visual_debug.x>.5 && visual_debug.x<1.5)color=vec3(z/70.0);
     if(visual_debug.x>1.5 && visual_debug.x<2.5)color=vec3(scatter*.5);

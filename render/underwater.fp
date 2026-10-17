@@ -66,18 +66,16 @@ float visibility(highp vec3 p,vec3 normal,float ndl) {
 }
 
 
-vec3 fogged(vec3 shaded,float density,bool surface) {
-    // Suspended sediment makes water near the basin floor more turbid.
-    // This follows world height in every camera view, including orbit/swimming.
-    density*=1.0+(1.0-smoothstep(-3.0,7.0,var_world.y))*.90;
-    float blend=1.0-exp(-max(var_depth-3.0,0.0)*density);
-    vec3 ray=normalize(var_world-camera_pos.xyz);
+vec3 fogged(vec3 shaded,float density) {
+    vec3 delta=var_world-camera_pos.xyz;
+    float travel=length(delta);
+    float transmission=exp(-max(travel-3.0,0.0)*density);
+    vec3 ray=delta/max(travel,.0001);
     vec3 sun=normalize(vec3(.35,.90,-.24));
-    vec3 fog=mix(vec3(0.061000,0.485000,0.875000),fog_settings.rgb,clamp(ray.y*.9+.42,0.0,1.0));
+    vec3 fog=mix(vec3(.061,.485,.875),fog_settings.rgb,clamp(ray.y*.9+.42,0.0,1.0));
     fog+=vec3(.012,.035,.04)*pow(max(dot(ray,sun),0.0),5.0);
-    if(surface)blend=max(blend,smoothstep(165.0,300.0,var_depth));
-    fog*=waterHazeLight(camera_pos.y,ray.y);
-    return mix(shaded*waterDaylight(var_world.y),fog,blend);
+    return shaded*waterDaylight(var_world.y)*transmission
+         +fog*waterScattering(camera_pos.y,var_world.y,travel,density);
 }
 void main() {
     if(visual_debug.x>11.5) {out_fragColor=vec4(vec3(params.x>7.5?1.0:0.0),1.0);return;}
@@ -198,6 +196,6 @@ void main() {
     }
     float density=fog_settings.w;
     if(params.x>2.5 && params.x<3.5)density*=.4;
-    shaded=fogged(shaded,density,false);
+    shaded=fogged(shaded,density);
     out_fragColor=vec4(shaded,1.0);
 }

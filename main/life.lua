@@ -42,7 +42,9 @@ function M.new()
             local g=s.groups[k]
             if not g then g={x=0,y=0,z=0,count=0,phase=#s.fish*.7};s.groups[k]=g end
             g.x=g.x+a.p[1];g.y=g.y+a.p[2];g.z=g.z+a.p[3];g.count=g.count+1
-            f.group=g;f.seed=#s.fish*.83;f.radius=.12*math.max(a.s[1],a.s[2],a.s[3])+.06
+            local scale=math.max(a.s[1],a.s[2],a.s[3])
+            f.group=g;f.seed=#s.fish*.83;f.index=#s.fish+1;f.radius=.12*scale+.06
+            f.half_length=.40*scale;f.personal=f.half_length+.50
             s.fish[#s.fish+1]=f
         elseif a.asset=='ray' then
             s.drifters[#s.drifters+1]=f
@@ -55,6 +57,11 @@ function M.new()
         end
     end
     for _,g in pairs(s.groups) do g.x=g.x/g.count;g.y=g.y/g.count;g.z=g.z/g.count end
+    for _,f in ipairs(s.fish) do
+        local g=f.group
+        f.station=vmath.vector3(f.anchor.x-g.x,f.anchor.y-g.y,f.anchor.z-g.z)*.65
+        local d=vmath.length(f.station);if d>4 then f.station=f.station*(4/d) end
+    end
     -- Static broad phase is built once, including the full convex hull extent.
     for _,b in ipairs(obstacles) do
         for x=math.floor((b[1]-b[4]-2)/6),math.floor((b[1]+b[4]+2)/6) do
@@ -76,9 +83,9 @@ function M.new()
     end
     return s
 end
-local stone_resolve
+local stone_resolve,separate_fish
 function M.reset(s,t)
-    s.accumulator=0;s.step=0;s.frozen_applied=false;s.phase=t/1.8;s.clip='idle';s.wake=0;s.vent_timer=0;s.serial=0;s.contacts=0;s.emitted=0;s.wake_emitted=0;s.neighbors=0
+    s.accumulator=0;s.step=0;s.frozen_applied=false;s.phase=t/1.8;s.clip='idle';s.pose_speed=0;s.wake=0;s.vent_timer=0;s.serial=0;s.contacts=0;s.emitted=0;s.wake_emitted=0;s.neighbors=0
     pose('/player#model','idle',s.phase%1)
     for i,f in ipairs(s.fish) do
         f.pose_tick=nil
@@ -88,6 +95,10 @@ function M.reset(s,t)
         f.old=vmath.vector3(f.x,f.y,f.z);f.target=f.old
         go.set_position(f.old,f.id);go.set_rotation(f.rotation,f.id)
         pose(f.url,'swim',(t/.7+f.seed)%1)
+    end
+    for _=1,4 do separate_fish(s) end
+    for _,f in ipairs(s.fish) do
+        f.old=vmath.vector3(f.x,f.y,f.z);f.target=f.old;go.set_position(f.old,f.id)
     end
     for _,r in ipairs(s.drifters) do r.p=vmath.vector3(r.anchor);go.set_position(r.p,r.id) end
     for _,p in ipairs(s.plants) do p.bend=0;p.velocity=0;p.pose_tick=nil;pose(p.url,'bend',.5) end
@@ -121,6 +132,37 @@ stone_resolve=function(s,x,y,z,r)
     end
     return x,math.max(y,collision.floor_height(x,z)+r),z
 end
+-- A spatial broad phase enforces body clearance when steering alone is too
+-- late. Symmetric corrections keep the school from collapsing into one point.
+separate_fish=function(s)
+    local grid={}
+    for _,f in ipairs(s.fish) do
+        f.push_x=0;f.push_y=0;f.push_z=0
+        grid_add(grid,f.x,f.y,f.z,3,f)
+    end
+    for _,f in ipairs(s.fish) do
+        nearby(grid,f.x,f.y,f.z,3,1.5,function(n)
+            if n.index<=f.index then return end
+            local dx,dy,dz=f.x-n.x,f.y-n.y,f.z-n.z
+            local dd=dx*dx+dy*dy+dz*dz;local space=f.half_length+n.half_length+.30
+            if dd<space*space then
+                local d=math.sqrt(dd)
+                if d<.00001 then dx=1;dy=0;dz=0;d=1;dd=0 end
+                local push=(space-math.sqrt(dd))*.51/d
+                dx=dx*push;dy=dy*push;dz=dz*push
+                f.push_x=f.push_x+dx;f.push_y=f.push_y+dy;f.push_z=f.push_z+dz
+                n.push_x=n.push_x-dx;n.push_y=n.push_y-dy;n.push_z=n.push_z-dz
+            end
+        end)
+    end
+    for _,f in ipairs(s.fish) do
+        if f.push_x~=0 or f.push_y~=0 or f.push_z~=0 then
+            f.x,f.y,f.z=stone_resolve(s,f.x+f.push_x,f.y+f.push_y,f.z+f.push_z,f.radius)
+        end
+        f.target=vmath.vector3(f.x,f.y,f.z)
+    end
+    return grid
+end
 local function schools(s,dt,t,player,body)
     local grid={};s.neighbors=0
     for _,f in ipairs(s.fish) do grid_add(grid,f.x,f.y,f.z,3,f) end
@@ -132,18 +174,18 @@ local function schools(s,dt,t,player,body)
             local dx,dy,dz=f.x-n.x,f.y-n.y,f.z-n.z;local dd=dx*dx+dy*dy+dz*dz
             if dd<6.76 and dd>.000001 then
                 if n.asset==f.asset then cx=cx+n.x;cy=cy+n.y;cz=cz+n.z;ax=ax+n.vx;ay=ay+n.vy;az=az+n.vz;count=count+1 end
-                local space=f.radius+n.radius+.32
-                if dd<space*space then local force=(space/math.sqrt(dd)-1)*4;sx=sx+dx*force;sy=sy+dy*force;sz=sz+dz*force end
+                local space=f.personal+n.personal
+                if dd<space*space then local force=(space/math.sqrt(dd)-1)*8;sx=sx+dx*force;sy=sy+dy*force;sz=sz+dz*force end
             end
         end)
         s.neighbors=s.neighbors+count
         local g=f.group
-        local tx=g.x+math.cos(t*.13+g.phase)*4;local ty=g.y+math.sin(t*.19+g.phase)*1.2;local tz=g.z+math.sin(t*.13+g.phase)*4
+        local tx=g.x+math.cos(t*.13+g.phase)*4+f.station.x;local ty=g.y+math.sin(t*.19+g.phase)*1.2+f.station.y;local tz=g.z+math.sin(t*.13+g.phase)*4+f.station.z
         local fx,fy,fz=(tx-f.x)*.16,(ty-f.y)*.20,(tz-f.z)*.16
         if count>0 then
-            fx=fx+(cx/count-f.x)*.26+(ax/count-f.vx)*.8
-            fy=fy+(cy/count-f.y)*.26+(ay/count-f.vy)*.8
-            fz=fz+(cz/count-f.z)*.26+(az/count-f.vz)*.8
+            fx=fx+(cx/count-f.x)*.07+(ax/count-f.vx)*.8
+            fy=fy+(cy/count-f.y)*.07+(ay/count-f.vy)*.8
+            fz=fz+(cz/count-f.z)*.07+(az/count-f.vz)*.8
         end
         fx=fx+sx;fy=fy+sy;fz=fz+sz
         local dx,dy,dz=f.x-player.x,f.y-player.y,f.z-player.z;local distance=length(dx,dy,dz)
@@ -160,23 +202,26 @@ local function schools(s,dt,t,player,body)
         local wx,wy,wz=currents.sample(f.x,f.y,f.z,t)
         f.old=vmath.vector3(f.x,f.y,f.z)
         f.x,f.y,f.z=stone_resolve(s,f.x+(f.vx+wx)*dt,f.y+(f.vy+wy)*dt,f.z+(f.vz+wz)*dt,f.radius)
-        -- Thrust can outrun soft steering. A near-body projection prevents
-        -- fish passing through the player during boosted head-on encounters.
-        if body and length(f.x-player.x,f.y-player.y,f.z-player.z)<4.5 then
-            for _,b in ipairs(body) do
-                local dx,dy,dz=f.x-player.x-b[1],f.y-player.y-b[2],f.z-player.z-b[3]
-                local d=length(dx,dy,dz);local clearance=b[4]+f.radius
-                if d<clearance then
-                    if d<.0001 then dx=.0001;dy=0;dz=0;d=.0001 end
-                    local push=(clearance-d+.002)/d
-                    f.x=f.x+dx*push;f.y=f.y+dy*push;f.z=f.z+dz*push
-                end
-            end
-            f.x,f.y,f.z=stone_resolve(s,f.x,f.y,f.z,f.radius)
-        end
-        f.target=vmath.vector3(f.x,f.y,f.z)
     end
-    s.fish_grid=grid
+    s.fish_grid=separate_fish(s)
+    -- Thrust can outrun soft steering. Project after crowd corrections so
+    -- neither avoidance stage can push a fish back into the player.
+    if body then
+        for _,f in ipairs(s.fish) do
+            if length(f.x-player.x,f.y-player.y,f.z-player.z)<4.5 then
+                for _,b in ipairs(body) do
+                    local dx,dy,dz=f.x-player.x-b[1],f.y-player.y-b[2],f.z-player.z-b[3]
+                    local d=length(dx,dy,dz);local clearance=b[4]+f.radius
+                    if d<clearance and d>.0001 then
+                        local push=(clearance-d+.002)/d
+                        f.x=f.x+dx*push;f.y=f.y+dy*push;f.z=f.z+dz*push
+                    end
+                end
+                f.x,f.y,f.z=stone_resolve(s,f.x,f.y,f.z,f.radius)
+                f.target=vmath.vector3(f.x,f.y,f.z)
+            end
+        end
+    end
 end
 local function foliage(s,dt,t,player,body)
     for i,p in ipairs(s.plants) do
@@ -255,9 +300,12 @@ function M.update(s,dt,t,player,rotation,speed,body,frozen)
         end
         s.phase=s.phase+dt*(.55+math.min(speed,8)*.17)/1.8
     end
-    local clip=speed>.7 and 'swim' or 'idle'
+    -- Cadence follows thrust smoothly; glide has a real, quieter joint action.
+    s.pose_speed=s.pose_speed or speed
+    s.pose_speed=frozen and speed or s.pose_speed+(speed-s.pose_speed)*(1-math.exp(-3*dt))
+    local clip=s.pose_speed>2.4 and 'swim' or (s.pose_speed>.45 and 'glide' or 'idle')
     if clip~=s.clip then
-        s.clip=clip;model.play_anim('/player#model',clip,go.PLAYBACK_LOOP_FORWARD,{playback_rate=0,blend_duration=frozen and 0 or .3})
+        s.clip=clip;model.play_anim('/player#model',clip,go.PLAYBACK_LOOP_FORWARD,{playback_rate=0,blend_duration=frozen and 0 or .55})
     end
     go.set('/player#model','cursor',s.phase%1)
     local alpha=(s.accumulator+.05*(s.step%2))/.1
@@ -296,10 +344,25 @@ function M.state(s)
     for i,p in ipairs(s.plants) do
         if vmath.length_sqr(p.anchor-vmath.vector3(-1,4.8,4))<400 then plant_samples[#plant_samples+1]={id=p.id,x=p.anchor.x,y=p.anchor.y,z=p.anchor.z,height=p.height,bend=p.bend} end
     end
+    local nearest={};local minimum_gap=1e9;local overlaps=0
+    for i,f in ipairs(s.fish) do
+        local closest=1e9
+        for j,n in ipairs(s.fish) do
+            if i~=j then
+                local d=length(f.x-n.x,f.y-n.y,f.z-n.z)
+                closest=math.min(closest,d)
+                local gap=d-f.half_length-n.half_length
+                minimum_gap=math.min(minimum_gap,gap)
+                if j>i and gap<0 then overlaps=overlaps+1 end
+            end
+        end
+        nearest[#nearest+1]=closest
+    end
+    table.sort(nearest)
     local fins={}
-    for _,name in ipairs({'root','tail_middle','peduncle','fin_left','fin_right'}) do
+    for _,name in ipairs({'root','tail_middle','peduncle','fin_left','fin_right','chest','head','shoulder_left','elbow_left','wrist_left','shoulder_right','elbow_right','wrist_right','hair_root','hair_tip'}) do
         local p=go.get_world_position(model.get_go('/player#model',name));fins[name]={x=p.x,y=p.y,z=p.z}
     end
-    return {maximum_fish_penetration=penetration,fish_samples=fish_samples,near_plants=plant_samples,drifters=#s.drifters,fish=#s.fish,plants=#s.plants,bubble_pool=#s.bubbles,active_bubbles=active,emitted=s.emitted,wake_emitted=s.wake_emitted,contacts=s.contacts,maximum_bend=max_bend,mean_fish_travel=travel/#s.fish,neighbor_pairs=s.neighbors,steps=s.step,clip=s.clip,phase=s.phase,bones=fins}
+    return {minimum_fish_gap=minimum_gap,fish_overlaps=overlaps,nearest_fish_p10=nearest[math.ceil(#nearest*.1)],nearest_fish_median=nearest[math.ceil(#nearest*.5)],maximum_fish_penetration=penetration,fish_samples=fish_samples,near_plants=plant_samples,drifters=#s.drifters,fish=#s.fish,plants=#s.plants,bubble_pool=#s.bubbles,active_bubbles=active,emitted=s.emitted,wake_emitted=s.wake_emitted,contacts=s.contacts,maximum_bend=max_bend,mean_fish_travel=travel/#s.fish,neighbor_pairs=s.neighbors,steps=s.step,clip=s.clip,phase=s.phase,bones=fins}
 end
 return M

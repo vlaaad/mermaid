@@ -173,9 +173,10 @@
     "bytes": 2612280,
     "source": "assets/source/mermaid.blend",
     "rig": {
-      "bones": 10,
+      "bones": 21,
       "clips": [
         "swim",
+        "glide",
         "idle"
       ],
       "max_influences": 2

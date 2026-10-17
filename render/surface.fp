@@ -55,8 +55,7 @@ void main() {
     vec3 color=surfaceColor(time_data.x);
     vec3 ray=normalize(var_world-camera_pos.xyz);
     vec3 fog=mix(vec3(.061,.485,.875),fog_settings.rgb,clamp(ray.y*.9+.42,0.0,1.0));
-    float blend=1.0-exp(-max(var_depth-3.0,0.0)*fog_settings.w);
-    blend=max(blend,smoothstep(165.0,300.0,var_depth));
-    fog*=waterHazeLight(camera_pos.y,ray.y);
-    out_fragColor=vec4(mix(color,fog,blend),1.0);
+    float travel=length(var_world-camera_pos.xyz);
+    float transmission=exp(-max(travel-3.0,0.0)*fog_settings.w);
+    out_fragColor=vec4(color*transmission+fog*waterScattering(camera_pos.y,var_world.y,travel,fog_settings.w),1.0);
 }
