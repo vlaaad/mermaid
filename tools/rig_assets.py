@@ -103,6 +103,40 @@ def rig(path,kind):
             return (([.055,.10,.14,.18][k]*math.sin(phase-.8-k*.55))*strength,
                     .035*math.sin(phase-1.2-k*.6)*strength,
                     .055*math.sin(phase-.6-k*.45)*strength)
+    elif kind=='ray':
+        names=['root','wing_left','wing_left_tip','wing_right','wing_right_tip','tail','tail_tip']
+        origins=[(0,0,0),(-.25,0,0),(-.85,-.01,.10),(.25,0,0),(.85,-.01,.10),(0,-.015,.45),(0,-.07,1.1)]
+        parents=[None,0,1,0,3,0,5]
+        j,weights=chain_weights(np.abs(pos[:,0]),[0,.30,1.25]);joints=j.copy()
+        for side,ids in [(-1,[0,1,2]),(1,[0,3,4])]:
+            mask=pos[:,0]*side>=0;joints[mask]=np.array(ids)[j[mask]]
+        core=(np.abs(pos[:,0])<.27)&(pos[:,2]<.50)
+        joints[core]=[0,0,0,0];weights[core]=[1,0,0,0]
+        tail=(pos[:,2]>.5)&(np.abs(pos[:,0])<.14)
+        j,w=chain_weights(pos[:,2],[.45,.85,1.85]);joints[tail]=np.array([0,5,6])[j[tail]];weights[tail]=w[tail]
+        clips=['swim'];duration=3.6;frames=49
+        def rotation(j,t,clip):
+            phase=t*math.tau/duration
+            if j in (1,2,3,4):
+                sign=-1 if j<3 else 1;outer=j in (2,4)
+                return (0,0,sign*(.23 if outer else .19)*math.sin(phase-(.65 if outer else 0)))
+            return (.018*math.sin(phase) if j==0 else 0,0,.09*math.sin(phase-j*.35) if j>=5 else 0)
+    elif kind=='whale':
+        names=['root','tail_base','tail_stem','fluke','fluke_left','fluke_right','pectoral_left','pectoral_right']
+        origins=[(0,0,0),(0,.18,1.4),(0,.18,3.5),(0,.10,4.5),(-.7,.10,4.7),(.7,.10,4.7),(-.78,-.32,-1.6),(.78,-.32,-1.6)]
+        parents=[None,0,1,2,3,3,0,0]
+        joints,weights=chain_weights(pos[:,2],[0,1.4,3.5,4.6])
+        fins=(colors[:,3]>.37)&(colors[:,3]<.62)
+        f=np.clip((np.abs(pos[:,0])-.78)/.7,0,1)
+        joints[fins,0]=0;joints[fins,1]=np.where(pos[fins,0]<0,6,7);weights[fins,0]=1-f[fins];weights[fins,1]=f[fins]
+        flukes=colors[:,3]>.62
+        f=np.clip(np.abs(pos[:,0])/.9,0,.65)
+        joints[flukes,0]=3;joints[flukes,1]=np.where(pos[flukes,0]<0,4,5);weights[flukes,0]=1-f[flukes];weights[flukes,1]=f[flukes]
+        clips=['swim'];duration=5.8;frames=49
+        def rotation(j,t,clip):
+            phase=t*math.tau/duration
+            if j<6:return ([.012,.12,.17,.15,.045,.045][j]*math.sin(phase-j*.55),0,0)
+            return (.035*math.sin(phase-.9),0,(1 if j==6 else -1)*.075*math.sin(phase-.7))
     elif kind=='plant':
         height=float(pos[:,1].max());names=['root','stem_1','stem_2','stem_3','crown']
         origins=[(0,height*i/4,0) for i in range(5)];parents=[None,0,1,2,3]
@@ -131,7 +165,7 @@ def rig(path,kind):
         for j in range(len(names)):
             rotations=[]
             for t in times:
-                if kind=='mermaid':
+                if kind in ('mermaid','ray','whale'):
                     x,y,z=rotation(j,float(t),clip);cx,sx=math.cos(x/2),math.sin(x/2);cy,sy=math.cos(y/2),math.sin(y/2);cz,sz=math.cos(z/2),math.sin(z/2)
                     q=[cz*cy*sx-sz*sy*cx,cz*sy*cx+sz*cy*sx,sz*cy*cx-cz*sy*sx,cz*cy*cx+sz*sy*sx]
                 else:

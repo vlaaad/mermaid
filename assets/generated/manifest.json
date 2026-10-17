@@ -166,7 +166,14 @@
     "triangles": 1304,
     "vertices": 2384,
     "unindexed_vertices": 3912,
-    "bytes": 131364
+    "bytes": 131364,
+    "rig": {
+      "bones": 7,
+      "clips": [
+        "swim"
+      ],
+      "max_influences": 2
+    }
   },
   "mermaid": {
     "triangles": 50224,
@@ -210,6 +217,20 @@
     "instances": 1945,
     "source_placements": 1955,
     "collision_boxes": 1362,
-    "seed": 73
+    "seed": 73,
+    "ocean_instances": 3
+  },
+  "whale": {
+    "triangles": 1268,
+    "vertices": 1900,
+    "unindexed_vertices": 3804,
+    "bytes": 107700,
+    "rig": {
+      "bones": 8,
+      "clips": [
+        "swim"
+      ],
+      "max_influences": 2
+    }
   }
 }

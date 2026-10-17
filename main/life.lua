@@ -2,6 +2,7 @@
 -- Bone tracks are real glTF animations; the shaders only skin those poses.
 local anchors=require 'main.living_world'
 local currents=require 'main.currents'
+local ocean=require 'main.ocean_motion'
 local collision=require 'main.collision'
 local obstacles=require 'main.obstacles'
 local M={}
@@ -81,6 +82,7 @@ function M.new()
         end
         s.vents[#s.vents+1]=vmath.vector3(x,y+.15,z)
     end
+    s.ocean=ocean.new(s.drifters)
     return s
 end
 local stone_resolve,separate_fish
@@ -100,7 +102,7 @@ function M.reset(s,t)
     for _,f in ipairs(s.fish) do
         f.old=vmath.vector3(f.x,f.y,f.z);f.target=f.old;go.set_position(f.old,f.id)
     end
-    for _,r in ipairs(s.drifters) do r.p=vmath.vector3(r.anchor);go.set_position(r.p,r.id) end
+    ocean.reset(s.ocean,t)
     for _,p in ipairs(s.plants) do p.bend=0;p.velocity=0;p.pose_tick=nil;pose(p.url,'bend',.5) end
     for _,b in ipairs(s.bubbles) do b.age=100;b.lifetime=0;go.set_scale(.0001,b.id) end
 end
@@ -291,10 +293,6 @@ function M.update(s,dt,t,player,rotation,speed,body,frozen)
         while s.accumulator>=.05 do
             s.step=s.step+1;s.accumulator=s.accumulator-.05
             local time=t-s.accumulator
-            for _,r in ipairs(s.drifters) do
-                local x,y,z=currents.sample(r.p.x,r.p.y,r.p.z,time)
-                r.p=r.p+vmath.vector3(x,y,z)*.05+(r.anchor-r.p)*.002
-            end
             if s.step%2==0 then schools(s,.1,time,player,body) end
             foliage(s,.05,time,player,body);bubbles(s,.05,time,player,rotation,speed)
         end
@@ -321,7 +319,7 @@ function M.update(s,dt,t,player,rotation,speed,body,frozen)
             go.set(f.url,'cursor',(t/.7+f.seed)%1);f.pose_tick=tick
         end
     end
-    for _,r in ipairs(s.drifters) do go.set_position(r.p,r.id) end
+    ocean.update(s.ocean,dt,t,player,frozen)
     for _,b in ipairs(s.bubbles) do
         if b.age<b.lifetime then
             go.set_position(b.p,b.id)
@@ -363,6 +361,6 @@ function M.state(s)
     for _,name in ipairs({'root','tail_middle','peduncle','fin_left','fin_right','chest','head','shoulder_left','elbow_left','wrist_left','shoulder_right','elbow_right','wrist_right','hair_root','hair_tip'}) do
         local p=go.get_world_position(model.get_go('/player#model',name));fins[name]={x=p.x,y=p.y,z=p.z}
     end
-    return {minimum_fish_gap=minimum_gap,fish_overlaps=overlaps,nearest_fish_p10=nearest[math.ceil(#nearest*.1)],nearest_fish_median=nearest[math.ceil(#nearest*.5)],maximum_fish_penetration=penetration,fish_samples=fish_samples,near_plants=plant_samples,drifters=#s.drifters,fish=#s.fish,plants=#s.plants,bubble_pool=#s.bubbles,active_bubbles=active,emitted=s.emitted,wake_emitted=s.wake_emitted,contacts=s.contacts,maximum_bend=max_bend,mean_fish_travel=travel/#s.fish,neighbor_pairs=s.neighbors,steps=s.step,clip=s.clip,phase=s.phase,bones=fins}
+    return {large_animals=ocean.state(s.ocean),whales=#s.ocean-#s.drifters,minimum_fish_gap=minimum_gap,fish_overlaps=overlaps,nearest_fish_p10=nearest[math.ceil(#nearest*.1)],nearest_fish_median=nearest[math.ceil(#nearest*.5)],maximum_fish_penetration=penetration,fish_samples=fish_samples,near_plants=plant_samples,drifters=#s.drifters,fish=#s.fish,plants=#s.plants,bubble_pool=#s.bubbles,active_bubbles=active,emitted=s.emitted,wake_emitted=s.wake_emitted,contacts=s.contacts,maximum_bend=max_bend,mean_fish_travel=travel/#s.fish,neighbor_pairs=s.neighbors,steps=s.step,clip=s.clip,phase=s.phase,bones=fins}
 end
 return M

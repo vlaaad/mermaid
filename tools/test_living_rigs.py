@@ -24,7 +24,7 @@ def skinned(g,clip,t):
 
 class Rigs(unittest.TestCase):
     def test_weight_normalization(self):
-        for name in ['mermaid','kelp','ribbon_kelp','fish','fish_blue','fish_orange','fish_silver']:
+        for name in ['mermaid','kelp','ribbon_kelp','fish','fish_blue','fish_orange','fish_silver','ray','whale']:
             g=GLB(ROOT/'assets/generated'/f'{name}.glb');attrs=g.doc['meshes'][0]['primitives'][0]['attributes'];w=g.read(attrs['WEIGHTS_0'])
             self.assertGreaterEqual(float(w.min()),0);self.assertLess(float(abs(w.sum(axis=1)-1).max()),1e-6);self.assertTrue((np.count_nonzero(w,axis=1)<=2).all())
     def test_mermaid_vertical_wave_reaches_fin(self):
@@ -50,6 +50,21 @@ class Rigs(unittest.TestCase):
         tips=(alpha>.62)&(alpha<.87)&(p[:,2]>.85)
         relative=frames[:,tips,:].mean(axis=1)-frames[:,scalp,:].mean(axis=1)
         self.assertGreater(float(np.linalg.norm(np.ptp(relative,axis=0))),.30)
+
+    def test_ray_wings_and_whale_flukes_swim(self):
+        for name,period in [('ray',3.6),('whale',5.8)]:
+            g=GLB(ROOT/'assets/generated'/f'{name}.glb');attrs=g.doc['meshes'][0]['primitives'][0]['attributes'];p=g.read(attrs['POSITION'])
+            frames=np.array([skinned(g,'swim',t) for t in np.linspace(0,period,13)])
+            if name=='ray':
+                left=p[:,0]<-1.2;right=p[:,0]>1.2
+                for wing in [left,right]:self.assertGreater(float(np.ptp(frames[:,wing,1].mean(axis=1))),.5)
+                # Both tips rise together in a vertical wingbeat.
+                self.assertGreater(float(np.corrcoef(frames[:,left,1].mean(axis=1),frames[:,right,1].mean(axis=1))[0,1]),.95)
+            else:
+                flukes=p[:,2]>4.5
+                self.assertGreater(float(np.ptp(frames[:,flukes,1].mean(axis=1))),1.0)
+                nose=p[:,2]<-2.5
+                self.assertLess(float(np.ptp(frames[:,nose,1].mean(axis=1))),.10)
 
     def test_plant_root_fixed_crown_bends(self):
         for name in ['kelp','ribbon_kelp']:

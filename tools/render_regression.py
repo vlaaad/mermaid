@@ -1,4 +1,4 @@
-"""Verify skinned plants/fish and rigid rays match their shadow geometry and near/far ground shadows agree."""
+"""Verify skinned plants, fish, rays and whales match their shadow geometry and near/far ground shadows agree."""
 import argparse,json,sys
 from pathlib import Path
 import numpy as np

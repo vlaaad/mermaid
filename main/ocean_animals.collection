@@ -1,0 +1,4 @@
+name: "ocean_animals"
+instances { id: "whale_0" prototype: "/assets/generated/whale.go" position {x:-30.000000 y:38.000000 z:-133.000000} rotation {w:1} scale3 {x:3.800000 y:3.800000 z:3.800000} }
+instances { id: "whale_1" prototype: "/assets/generated/whale.go" position {x:74.698971 y:32.572597 z:-152.872554} rotation {w:1} scale3 {x:4.200000 y:4.200000 z:4.200000} }
+instances { id: "whale_2" prototype: "/assets/generated/whale.go" position {x:-84.113349 y:-36.181405 z:73.463536} rotation {w:1} scale3 {x:3.600000 y:3.600000 z:3.600000} }

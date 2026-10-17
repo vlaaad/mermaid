@@ -16,6 +16,7 @@ import numpy as np
 from PIL import Image
 import bathymetry
 import deep_details
+import sea_animals
 from rig_assets import rig
 from water_patterns import caustics as bake_caustics, surface_normals, sunlight_aperture
 from world_geometry import triangles as read_triangles, rotation as rotation_matrix, convex_collider, Support
@@ -425,7 +426,7 @@ def ray():
                 u0,u1=i/12,(i+1)/12;v0,v1=j/8,(j+1)/8
                 for layer,col in [(1,top),(-1,belly)]:
                     pts=[wing(u0,v0,layer),wing(u1,v0,layer),wing(u1,v1,layer),wing(u0,v1,layer)]
-                    if layer<0:pts.reverse()
+                    if (layer<0)!=(side>0):pts.reverse()
                     m.quad(*pts,col)
         m.tube([(side*.14,-.015,-.39),(side*.20,-.02,-.52),(side*.28,.015,-.57)],[.045,.045,.025],belly,8)
         m.ellipsoid((side*.19,.065,-.28),(.03,.018,.028),(.035,.07,.08),5,8)
@@ -633,6 +634,8 @@ def main():
     orange=fish();orange.c=[(.73,.38,.14,1) if c[0]>.1 else c for c in orange.c];orange.save('fish_orange','fish')
     silver=fish();silver.c=[(.65,.73,.63,1) if c[0]>.1 else c for c in silver.c];silver.save('fish_silver','fish')
     ray().save('ray','ray')
+    sea_animals.whale(Mesh).save('whale','whale')
+    sea_animals.export_routes(ROOT)
     mermaid().save('mermaid','mermaid')
     bathymetry.mesh(Mesh).save('seabed','sand')
     bathymetry.export_collision(ROOT/'main/seafloor.lua')
@@ -674,11 +677,11 @@ def main():
     finish_character()
     finish_ruins()
     finish_foreground_stone()
-    for name,kind in [("mermaid","mermaid"),("kelp","plant"),("ribbon_kelp","plant"),("fish","fish"),("fish_blue","fish"),("fish_orange","fish"),("fish_silver","fish")]:
+    for name,kind in [("mermaid","mermaid"),("kelp","plant"),("ribbon_kelp","plant"),("fish","fish"),("fish_blue","fish"),("fish_orange","fish"),("fish_silver","fish"),("ray","ray"),("whale","whale")]:
         STATS[name]["rig"]=rig(OUT/f"{name}.glb",kind)
     rig_source=ROOT/'tools/save_living_rigs.py'
     rig_cache=ROOT/'assets/source/living-rigs-build.json'
-    signature=hashlib.sha256(rig_source.read_bytes()+b''.join((OUT/f'{name}.glb').read_bytes() for name in ['mermaid','kelp','ribbon_kelp','fish'])).hexdigest()
+    signature=hashlib.sha256(rig_source.read_bytes()+b''.join((OUT/f'{name}.glb').read_bytes() for name in ['mermaid','kelp','ribbon_kelp','fish','ray','whale'])).hexdigest()
     cached=json.loads(rig_cache.read_text()) if rig_cache.exists() else {}
     if cached.get('signature')!=signature:
         subprocess.run([shutil.which('blender') or '/snap/bin/blender','--background','--python',str(rig_source),'--',str(ROOT)],check=True)
@@ -972,7 +975,7 @@ def main():
     (ROOT/'assets/source/landmarks.json').write_text(json.dumps(landmark_records,indent=2)+'\n')
     (ROOT/'main/world.collection').write_text('name: "world"\n'+ '\n'.join(objects)+'\n')
     (ROOT/'main/obstacles.lua').write_text('return '+json.dumps(obstacles,separators=(',',':')).replace('[','{').replace(']','}')+'\n')
-    STATS['world']={"instances":len(objects),"source_placements":placements,"collision_boxes":len(obstacles),"seed":73}
+    STATS['world']={"instances":len(objects),"ocean_instances":len(sea_animals.WHALES),"source_placements":placements,"collision_boxes":len(obstacles),"seed":73}
     (OUT/'manifest.json').write_text(json.dumps(STATS,indent=2)+'\n')
     print(json.dumps(STATS,indent=2))
 

@@ -25,3 +25,4 @@ instances {
   position {x:0 y:0 z:0}
   rotation {x:0 y:0 z:0 w:1}
 }
+collection_instances { id: "ocean" collection: "/main/ocean_animals.collection" position {x:0 y:0 z:0} rotation {w:1} scale: 1 }

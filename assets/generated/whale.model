@@ -1,0 +1,10 @@
+mesh: "/assets/generated/whale.glb"
+materials {
+ name: "reef"
+ material: "/render/whale.material"
+ textures { sampler: "caustics" texture: "/assets/generated/caustics.png" }
+ textures { sampler: "stone_detail" texture: "/assets/textures/limestone-v1.png" }
+}
+skeleton: "/assets/generated/whale.glb"
+animations: "/assets/generated/whale.glb"
+create_go_bones: false

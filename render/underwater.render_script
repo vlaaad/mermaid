@@ -117,7 +117,7 @@ function update(self)
             render.set_cull_face(category==0 and graphics.FACE_TYPE_FRONT or graphics.FACE_TYPE_BACK)
         else render.disable_state(graphics.STATE_CULL_FACE) end
         if (category~=1 and category~=2 and category~=3 and category~=6) or self.constants.visual_debug.y<.5 then
-            render.enable_material((category==1 or category==2 or category==3) and "shadow_moments_skinned" or "shadow_moments")
+            render.enable_material((category==1 or category==2 or category==3 or category==6) and "shadow_moments_skinned" or "shadow_moments")
             render.draw(self.casters[category],{constants=self.shadow_constants,frustum=near_caster_frustum})
         end
     end
@@ -159,7 +159,7 @@ function update(self)
         -- Compare visible and shadow vertex paths for plants, fish and rays.
         if self.constants.visual_debug.x>10.5 then render.enable_material("shadow") end
         for _,category in ipairs({1,2,3,6}) do
-            if self.constants.visual_debug.x>10.5 then render.enable_material(category==6 and "shadow" or "shadow_skinned") end
+            if self.constants.visual_debug.x>10.5 then render.enable_material("shadow_skinned") end
             render.draw(self.casters[category],{constants=self.constants,frustum=projection*self.view})
         end
         if self.constants.visual_debug.x>10.5 then render.disable_material() end
