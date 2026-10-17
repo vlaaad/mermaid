@@ -40,7 +40,15 @@ highp float bound(highp vec2 moments,highp float receiver) {
     return receiver<=moments.x?1.0:variance/(variance+delta*delta);
 }
 highp float nearVisibility(highp vec3 q) {
-    highp vec4 m=texture(near_shadow,q.xy);
+    // Explicit bilinear filtering keeps RGBA32F complete without WebGL's
+    // optional OES_texture_float_linear extension.
+    highp vec4 m;
+    if(time_data.z<.5)m=texture(near_shadow,q.xy);
+    else {
+        highp vec2 pixel=q.xy*512.0-.5,f=fract(pixel),tap=(floor(pixel)+.5)/512.0;
+        m=mix(mix(texture(near_shadow,tap),texture(near_shadow,tap+vec2(1,0)/512.0),f.x),
+              mix(texture(near_shadow,tap+vec2(0,1)/512.0),texture(near_shadow,tap+vec2(1,1)/512.0),f.x),f.y);
+    }
     highp float z=q.z-.00006;
     highp float v=min(bound(m.xy,exp(32.0*(z-1.0))),bound(m.zw,-exp(-32.0*z)));
     return clamp((v-.15)/.85,0.0,1.0);

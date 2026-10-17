@@ -1,0 +1,6 @@
+size { x: 400 y: 24 }
+color { x: .9 y: 1 z: .85 w: 1 }
+pivot: PIVOT_NW
+text: ""
+font: "/builtins/fonts/default.font"
+material: "/render/profiling.material"

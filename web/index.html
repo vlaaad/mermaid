@@ -9,8 +9,10 @@
 <style>
 *{box-sizing:border-box}[hidden]{display:none!important}html,body{margin:0;width:100%;height:100%;overflow:hidden;overscroll-behavior:none;background:#071e2e}body{display:grid;place-items:center}
 #app-container{position:relative}#canvas{display:block;width:100%;height:100%;outline:none;touch-action:none;user-select:none;-webkit-user-select:none}#canvas-container{width:100%;height:100%}
-#fullscreen{position:absolute;top:max(12px,env(safe-area-inset-top));right:calc(max(12px,env(safe-area-inset-right)) + 72px);width:44px;height:44px;display:grid;place-items:center;padding:11px;border:1px solid #dcf8ff44;border-radius:10px;color:#e4f9ff;background:#082a3b66;cursor:pointer;touch-action:manipulation}
+#fullscreen{position:absolute;top:max(12px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));width:44px;height:44px;display:grid;place-items:center;padding:11px;border:1px solid #dcf8ff44;border-radius:10px;color:#e4f9ff;background:#082a3b66;cursor:pointer;touch-action:manipulation}
 #fullscreen:hover,#fullscreen:focus-visible{background:#082a3bcc;border-color:#dcf8ff99}
+#app-container:fullscreen #fullscreen{display:none}
+#app-container:-webkit-full-screen #fullscreen{display:none}
 #fullscreen svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 #fullscreen[aria-pressed="false"] .collapse,#fullscreen[aria-pressed="true"] .expand{display:none}
 </style>
@@ -23,7 +25,7 @@
 // button. Movement, steering and the invisible profiler toggle live in Lua.
 const query=new URLSearchParams(location.search);
 CUSTOM_PARAMETERS.resize_window_callback=function(){
- const fill=!!(document.fullscreenElement||document.webkitFullscreenElement)||matchMedia('(pointer:coarse)').matches;
+ const fill=!!(document.fullscreenElement||document.webkitFullscreenElement)||matchMedia('(pointer:coarse), (max-width:900px)').matches;
  const w=fill?innerWidth:Math.min(innerWidth,innerHeight*16/9),h=fill?innerHeight:w*9/16;
  const app=document.querySelector('#app-container'),canvas=document.querySelector('#canvas');
  app.style.width=w+'px';app.style.height=h+'px';
@@ -35,6 +37,9 @@ CUSTOM_PARAMETERS.update_progress=()=>{};
 CUSTOM_PARAMETERS.start_error=e=>console.error('Unable to enter Atlantis:',e);
 if(query.has('trace'))CUSTOM_PARAMETERS.engine_arguments.push('--config=profiler.performance_timeline_enabled=1');
 CUSTOM_PARAMETERS.engine_arguments.push('--config=display.update_frequency=0');
+// DEFAULT moment samplers use nearest in WebGL; shaders reconstruct their
+// filtering. Other scene samplers declare their own explicit filtering.
+CUSTOM_PARAMETERS.engine_arguments.push('--config=graphics.default_texture_min_filter=nearest','--config=graphics.default_texture_mag_filter=nearest');
 const canvas=document.querySelector('#canvas');
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 document.addEventListener('keydown',e=>{if(e.target===canvas&&['Space','ArrowUp','ArrowDown'].includes(e.code))e.preventDefault();});
@@ -44,6 +49,7 @@ const fullscreenButton=document.querySelector('#fullscreen'),app=document.queryS
 fullscreenButton.hidden=!(app.requestFullscreen||app.webkitRequestFullscreen);
 function syncFullscreen(){
  const active=!!(document.fullscreenElement||document.webkitFullscreenElement);
+ fullscreenButton.hidden=active||!(app.requestFullscreen||app.webkitRequestFullscreen);
  fullscreenButton.setAttribute('aria-pressed',String(active));
  fullscreenButton.setAttribute('aria-label',active?'Exit fullscreen':'Enter fullscreen');
  fullscreenButton.title=active?'Exit fullscreen':'Enter fullscreen';

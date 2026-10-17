@@ -1,7 +1,7 @@
-local function target(w,h,depth_texture,format,samples)
+local function target(w,h,depth_texture,format,samples,filter)
     return render.render_target({
         sample_count=samples or 1,
-        [graphics.BUFFER_TYPE_COLOR0_BIT]={format=format or graphics.TEXTURE_FORMAT_RGBA,width=w,height=h,min_filter=graphics.TEXTURE_FILTER_LINEAR,mag_filter=graphics.TEXTURE_FILTER_LINEAR,u_wrap=graphics.TEXTURE_WRAP_CLAMP_TO_EDGE,v_wrap=graphics.TEXTURE_WRAP_CLAMP_TO_EDGE},
+        [graphics.BUFFER_TYPE_COLOR0_BIT]={format=format or graphics.TEXTURE_FORMAT_RGBA,width=w,height=h,min_filter=filter or graphics.TEXTURE_FILTER_LINEAR,mag_filter=filter or graphics.TEXTURE_FILTER_LINEAR,u_wrap=graphics.TEXTURE_WRAP_CLAMP_TO_EDGE,v_wrap=graphics.TEXTURE_WRAP_CLAMP_TO_EDGE},
         [graphics.BUFFER_TYPE_DEPTH_BIT]={format=graphics.TEXTURE_FORMAT_DEPTH,width=w,height=h,flags=depth_texture and render.TEXTURE_BIT or 0,min_filter=graphics.TEXTURE_FILTER_NEAREST,mag_filter=graphics.TEXTURE_FILTER_NEAREST,u_wrap=graphics.TEXTURE_WRAP_CLAMP_TO_EDGE,v_wrap=graphics.TEXTURE_WRAP_CLAMP_TO_EDGE}
     })
 end
@@ -13,11 +13,12 @@ function init(self)
     local fxaa=sys.get_sys_info().system_name=="HTML5" and requested>1
     self.scene_samples=fxaa and 1 or requested
     self.fxaa=fxaa
+    self.manual_shadow=sys.get_sys_info().system_name=="HTML5"
     self.solid=render.predicate({"reefsolid"})
     self.thin=render.predicate({"reefthin"})
     self.rigid=render.predicate({"rigid"})
     self.surface=render.predicate({"surface"})
-    self.debug_text=render.predicate({"debug_text"})
+    self.profile_text=render.predicate({"profile_text"})
     self.skinned=render.predicate({"skinned"})
     self.bubbles=render.predicate({"bubbles"})
     self.casters={}
@@ -29,13 +30,14 @@ function init(self)
     self.constants.visual_debug=vmath.vector4()
     self.constants.antialias=vmath.vector4(self.fxaa and 1 or 0,0,0,0)
     print("SCENE_AA "..(self.fxaa and "FXAA" or (self.scene_samples>1 and "MSAA x"..self.scene_samples or "OFF")))
-    self.constants.time_data=vmath.vector4(3,0,0,0)
+    self.constants.time_data=vmath.vector4(3,0,self.manual_shadow and 1 or 0,0)
     self.constants.surface_time=vmath.vector4(3,0,0,0)
     self.constants.camera_pos=vmath.vector4(0,7,13,1)
     self.constants.fog_settings=vmath.vector4(0.062500,0.625000,0.945500,.0165)
     self.shadow=target(2048,2048,true)
-    self.near_shadow=target(512,512,false,graphics.TEXTURE_FORMAT_RGBA32F)
-    self.near_ping=target(512,512,false,graphics.TEXTURE_FORMAT_RGBA32F)
+    local moment_filter=self.manual_shadow and graphics.TEXTURE_FILTER_NEAREST or graphics.TEXTURE_FILTER_LINEAR
+    self.near_shadow=target(512,512,false,graphics.TEXTURE_FORMAT_RGBA32F,nil,moment_filter)
+    self.near_ping=target(512,512,false,graphics.TEXTURE_FORMAT_RGBA32F,nil,moment_filter)
     self.blur_constants=render.constant_buffer()
     self.shadow_focus=vmath.vector3(-1,4.8,4)
 end
@@ -45,6 +47,16 @@ function update(self)
     if w==0 or h==0 then return end
     local scale=math.min(1,1280/w,720/h)
     local rw,rh=math.floor(w*scale),math.floor(h*scale)
+    if self.target and (rw~=self.rw or rh~=self.rh) then
+        -- WebGL validates completeness while each attachment is resized. A
+        -- color/depth target can be temporarily mismatched and abort the engine.
+        -- Replace whole targets at the frame boundary instead.
+        if self.scene_depth~=self.target then render.delete_render_target(self.scene_depth) end
+        render.delete_render_target(self.target)
+        render.delete_render_target(self.composite)
+        render.delete_render_target(self.water)
+        self.target=nil
+    end
     if not self.target then
         -- MSAA belongs on geometry, before the resolved image reaches post effects.
         self.target=target(rw,rh,self.scene_samples==1,nil,self.scene_samples)
@@ -54,12 +66,6 @@ function update(self)
         self.composite=target(rw,rh,false)
         self.rw,self.rh=rw,rh
         self.water=target(math.ceil(rw/4),math.ceil(rh/4),false,graphics.TEXTURE_FORMAT_RGBA16F)
-    elseif rw~=self.rw or rh~=self.rh then
-        render.set_render_target_size(self.target,rw,rh)
-        if self.scene_depth~=self.target then render.set_render_target_size(self.scene_depth,rw,rh) end
-        render.set_render_target_size(self.composite,rw,rh)
-        render.set_render_target_size(self.water,math.ceil(rw/4),math.ceil(rh/4))
-        self.rw,self.rh=rw,rh
     end
     local camera=self.constants.camera_pos
     local sun=vmath.normalize(vmath.vector3(.35,.90,-.24))
@@ -131,12 +137,12 @@ function update(self)
     render.enable_material("shadow_blur")
     render.set_render_target(self.near_ping)
     render.enable_texture("moments",self.near_shadow,graphics.BUFFER_TYPE_COLOR0_BIT)
-    self.blur_constants.blur_direction=vmath.vector4(1/512,0,0,0)
+    self.blur_constants.blur_direction=vmath.vector4(1/512,0,self.manual_shadow and 1 or 0,0)
     render.draw(self.blit,{constants=self.blur_constants})
     render.disable_texture("moments")
     render.set_render_target(self.near_shadow)
     render.enable_texture("moments",self.near_ping,graphics.BUFFER_TYPE_COLOR0_BIT)
-    self.blur_constants.blur_direction=vmath.vector4(0,1/512,0,0)
+    self.blur_constants.blur_direction=vmath.vector4(0,1/512,self.manual_shadow and 1 or 0,0)
     render.draw(self.blit,{constants=self.blur_constants})
     render.disable_texture("moments")
     render.disable_material()
@@ -236,7 +242,7 @@ function update(self)
     render.set_projection(vmath.matrix4_orthographic(0,w,0,h,-1,1))
     render.enable_state(graphics.STATE_BLEND)
     render.set_blend_func(graphics.BLEND_FACTOR_SRC_ALPHA,graphics.BLEND_FACTOR_ONE_MINUS_SRC_ALPHA)
-    render.draw(self.debug_text)
+    render.draw(self.profile_text)
     render.disable_state(graphics.STATE_BLEND)
 
 
@@ -253,7 +259,7 @@ function on_message(self,id,message)
     if id==hash("scene_camera") then
         self.view=message.view
         self.constants.camera_pos=message.position
-        self.constants.time_data=message.time_data
+        self.constants.time_data=vmath.vector4(message.time_data.x,message.time_data.y,self.manual_shadow and 1 or 0,0)
         self.constants.surface_time=message.time_data
         self.shadow_focus=message.shadow_focus or self.shadow_focus
     end

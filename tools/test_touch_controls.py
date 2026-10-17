@@ -82,4 +82,12 @@ filtered,events=ui.filter_touches(contacts,{{id=1,x=100,y=300},{id=2,released=tr
 M.apply(s,filtered,1280,720);assert(s.forward)
 assert(ui.hit(330,770,375,812)=='profiler' and not ui.hit(330,600,375,812))
 ''')
+    def test_fps_toggle_works_without_debug_profiler_in_release(self):
+        self.run_lua('''
+local ui=require 'main.game_ui';local s={};local messages={}
+profiler=nil
+msg={post=function(url,id)messages[#messages+1]={url,id}end}
+ui.activate(s,'profiler');assert(s.profiling and messages[1][2]=='enable')
+ui.activate(s,'profiler');assert(not s.profiling and messages[2][2]=='disable')
+''')
 if __name__=='__main__':unittest.main()

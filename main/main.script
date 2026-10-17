@@ -85,6 +85,7 @@ function init(self)
     self.publish_timer=0
     self.frame_ms=0
     self.profiling=false
+    msg.post('/profiling#text','disable')
     if html5 then
         self.frozen=html5.run("String(new URLSearchParams(location.search).has('capture'))")=="true"
     end
@@ -138,7 +139,11 @@ function update(self,dt)
         self.profile_last=now
         if self.profile_fps then
             local _,h=window.get_size()
-            msg.post('@render:','draw_debug_text',{text=string.format('%.1f FPS  |  %.1f ms/frame',self.profile_fps,1000/self.profile_fps),position=vmath.vector3(16,h-44,0),color=vmath.vector4(.9,1,.85,1)})
+            if self.profile_draw_fps~=self.profile_fps or self.profile_h~=h then
+                go.set_position(vmath.vector3(16,h-36,0),'/profiling')
+                label.set_text('/profiling#text',string.format('%.1f FPS  |  %.1f ms/frame',self.profile_fps,1000/self.profile_fps))
+                self.profile_draw_fps=self.profile_fps;self.profile_h=h
+            end
         end
     end
     local raw_dt=dt

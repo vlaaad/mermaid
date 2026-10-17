@@ -1,5 +1,11 @@
 name: "main"
 scale_along_z: 0
+embedded_instances {
+  id: "profiling"
+  data: "components { id: \"text\" component: \"/main/profiling.label\" position {x:0 y:0 z:0} rotation {w:1} }\n"
+  position {x:0 y:0 z:0}
+  rotation {w:1}
+}
 collection_instances {
   id: "reef"
   collection: "/main/world.collection"

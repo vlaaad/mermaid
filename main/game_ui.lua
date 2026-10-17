@@ -28,9 +28,12 @@ function M.activate(state,role)
     if role=='profiler' then
         state.profiling=not state.profiling
         state.profile_last=nil;state.profile_fps=nil;state.profile_elapsed=0;state.profile_frames=0
-        profiler.enable_ui(state.profiling)
-        if state.profiling then
-            profiler.set_ui_view_mode(profiler.VIEW_MODE_MINIMIZED)
+        msg.post('/profiling#text',state.profiling and 'enable' or 'disable')
+        -- The built-in profiler is absent in release engines. The ordinary
+        -- label still displays measured FPS there.
+        if profiler and profiler.enable_ui then
+            profiler.enable_ui(state.profiling)
+            if state.profiling then profiler.set_ui_view_mode(profiler.VIEW_MODE_MINIMIZED) end
         end
     end
 end
