@@ -15,11 +15,12 @@ function init(self)
     self.fxaa=fxaa
     self.solid=render.predicate({"reefsolid"})
     self.thin=render.predicate({"reefthin"})
+    self.rigid=render.predicate({"rigid"})
+    self.skinned=render.predicate({"skinned"})
     self.bubbles=render.predicate({"bubbles"})
     self.casters={}
     for _,category in ipairs({0,1,2,3,6,8}) do self.casters[category]=render.predicate({"caster"..category}) end
     self.shadow_constants=render.constant_buffer()
-    self.text=render.predicate({"tile"})
     self.blit=render.predicate({"blit"})
     self.view=vmath.matrix4_look_at(vmath.vector3(0,7,13),vmath.vector3(0,6,-13),vmath.vector3(0,1,0))
     self.constants=render.constant_buffer()
@@ -61,9 +62,8 @@ function update(self)
     local sun=vmath.normalize(vmath.vector3(.35,.90,-.24))
     local right=vmath.normalize(vmath.cross(-sun,vmath.vector3(0,0,1)))
     local up=vmath.normalize(vmath.cross(right,-sun))
-    -- All scenery is currently rigid. Cache full-world sunlight coverage so
-    -- orbiting the camera cannot move its boundary through visible shadows.
-    -- Future currents/crowds must invalidate this cache when their actors move.
+    -- Cache only fixed stone and sand. Jointed foliage, fish and the
+    -- mermaid cast through the local dynamic cascade with their current pose.
     local center=vmath.vector3(10,0,-55)
     local light_view=vmath.matrix4_look_at(center+sun*120,center,vmath.vector3(0,0,1))
     local light_proj=vmath.matrix4_orthographic(-96,96,-88,120,1,240)
@@ -81,7 +81,7 @@ function update(self)
         render.enable_material("shadow")
         render.enable_state(graphics.STATE_POLYGON_OFFSET_FILL)
         render.set_polygon_offset(1,1)
-        for _,category in ipairs({0,1,2,6,8}) do
+        for _,category in ipairs({0,8}) do
             if category==0 or category==8 then
                 render.enable_state(graphics.STATE_CULL_FACE)
                 render.set_cull_face(category==0 and graphics.FACE_TYPE_FRONT or graphics.FACE_TYPE_BACK)
@@ -116,7 +116,8 @@ function update(self)
             render.enable_state(graphics.STATE_CULL_FACE)
             render.set_cull_face(category==0 and graphics.FACE_TYPE_FRONT or graphics.FACE_TYPE_BACK)
         else render.disable_state(graphics.STATE_CULL_FACE) end
-        if category~=3 or self.constants.visual_debug.y<.5 then
+        if (category~=1 and category~=2 and category~=3 and category~=6) or self.constants.visual_debug.y<.5 then
+            render.enable_material((category==1 or category==2 or category==3) and "shadow_moments_skinned" or "shadow_moments")
             render.draw(self.casters[category],{constants=self.shadow_constants,frustum=near_caster_frustum})
         end
     end
@@ -157,7 +158,8 @@ function update(self)
     if self.constants.visual_debug.x>9.5 and self.constants.visual_debug.x<11.5 then
         -- Compare visible and shadow vertex paths for plants, fish and rays.
         if self.constants.visual_debug.x>10.5 then render.enable_material("shadow") end
-        for _,category in ipairs({1,2,6}) do
+        for _,category in ipairs({1,2,3,6}) do
+            if self.constants.visual_debug.x>10.5 then render.enable_material(category==6 and "shadow" or "shadow_skinned") end
             render.draw(self.casters[category],{constants=self.constants,frustum=projection*self.view})
         end
         if self.constants.visual_debug.x>10.5 then render.disable_material() end
@@ -190,9 +192,10 @@ function update(self)
         render.enable_material("scene_depth")
         render.enable_state(graphics.STATE_CULL_FACE)
         render.set_cull_face(graphics.FACE_TYPE_BACK)
-        render.draw(self.solid,{frustum=projection*self.view})
         render.disable_state(graphics.STATE_CULL_FACE)
-        render.draw(self.thin,{frustum=projection*self.view})
+        render.draw(self.rigid,{frustum=projection*self.view})
+        render.enable_material("scene_depth_skinned")
+        render.draw(self.skinned,{frustum=projection*self.view})
         render.disable_material()
         render.disable_state(graphics.STATE_DEPTH_TEST)
         render.set_depth_mask(false)
@@ -223,15 +226,10 @@ function update(self)
     render.draw(self.blit,{constants=self.constants})
     render.disable_material()
     render.disable_texture("scene_texture")
-    render.enable_state(graphics.STATE_BLEND)
-    render.set_blend_func(graphics.BLEND_FACTOR_ONE,graphics.BLEND_FACTOR_ONE_MINUS_SRC_ALPHA)
-    render.set_view(vmath.matrix4())
-    render.set_projection(vmath.matrix4_orthographic(0,1280,0,720,-1,1))
-    render.draw(self.text)
+
 end
 
 function on_reload(self)
-    self.text=render.predicate({"tile"})
     self.shadow_valid=false
 end
 

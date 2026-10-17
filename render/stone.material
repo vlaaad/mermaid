@@ -1,5 +1,6 @@
 name: "stone"
 tags: "reef"
+tags: "rigid"
 tags: "reefsolid"
 tags: "caster0"
 vertex_program: "/render/underwater.vp"

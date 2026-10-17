@@ -1,5 +1,6 @@
 name: "ray"
 tags: "reef"
+tags: "rigid"
 tags: "reefthin"
 tags: "caster6"
 vertex_program: "/render/underwater.vp"

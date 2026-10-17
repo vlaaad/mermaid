@@ -1,9 +1,11 @@
 name: "mermaid"
 tags: "reef"
+tags: "skinned"
 tags: "reefthin"
 tags: "caster3"
-vertex_program: "/render/underwater.vp"
+vertex_program: "/render/skinned.vp"
 fragment_program: "/render/underwater.fp"
+samplers { name: "pose_matrix_cache" wrap_u: WRAP_MODE_CLAMP_TO_EDGE wrap_v: WRAP_MODE_CLAMP_TO_EDGE filter_min: FILTER_MODE_MIN_NEAREST filter_mag: FILTER_MODE_MAG_NEAREST }
 vertex_space: VERTEX_SPACE_LOCAL
 vertex_constants { name: "mtx_view" type: CONSTANT_TYPE_VIEW }
 vertex_constants { name: "mtx_proj" type: CONSTANT_TYPE_PROJECTION }

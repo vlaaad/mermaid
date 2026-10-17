@@ -25,17 +25,3 @@ instances {
   position {x:0 y:0 z:0}
   rotation {x:0 y:0 z:0 w:1}
 }
-embedded_instances {
-  id: "controls"
-  data: "components { id: \"label\" component: \"/main/controls.label\" position {x:0 y:0 z:0} rotation {x:0 y:0 z:0 w:1} }\n"
-  position { x:26 y:22 z:0 }
-  rotation {x:0 y:0 z:0 w:1}
-  scale3 {x:1 y:1 z:1}
-}
-embedded_instances {
-  id: "depth"
-  data: "components { id: \"label\" component: \"/main/depth.label\" position {x:0 y:0 z:0} rotation {x:0 y:0 z:0 w:1} }\n"
-  position { x:1254 y:692 z:0 }
-  rotation {x:0 y:0 z:0 w:1}
-  scale3 {x:1 y:1 z:1}
-}

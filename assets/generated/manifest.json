@@ -48,17 +48,43 @@
     "bytes": 1028120,
     "source": "assets/source/ruins.blend"
   },
+  "amphora": {
+    "triangles": 400,
+    "vertices": 720,
+    "unindexed_vertices": 1200,
+    "bytes": 40628
+  },
+  "plinth": {
+    "triangles": 64,
+    "vertices": 130,
+    "unindexed_vertices": 192,
+    "bytes": 8204
+  },
   "kelp": {
     "triangles": 672,
     "vertices": 900,
     "unindexed_vertices": 2016,
-    "bytes": 52544
+    "bytes": 52544,
+    "rig": {
+      "bones": 5,
+      "clips": [
+        "bend"
+      ],
+      "max_influences": 2
+    }
   },
   "ribbon_kelp": {
     "triangles": 600,
     "vertices": 1800,
     "unindexed_vertices": 1800,
-    "bytes": 94896
+    "bytes": 94896,
+    "rig": {
+      "bones": 5,
+      "clips": [
+        "bend"
+      ],
+      "max_influences": 2
+    }
   },
   "sponge": {
     "triangles": 1568,
@@ -88,25 +114,53 @@
     "triangles": 162,
     "vertices": 120,
     "unindexed_vertices": 486,
-    "bytes": 8976
+    "bytes": 8976,
+    "rig": {
+      "bones": 3,
+      "clips": [
+        "swim"
+      ],
+      "max_influences": 2
+    }
   },
   "fish_blue": {
     "triangles": 162,
     "vertices": 120,
     "unindexed_vertices": 486,
-    "bytes": 8988
+    "bytes": 8988,
+    "rig": {
+      "bones": 3,
+      "clips": [
+        "swim"
+      ],
+      "max_influences": 2
+    }
   },
   "fish_orange": {
     "triangles": 162,
     "vertices": 120,
     "unindexed_vertices": 486,
-    "bytes": 8992
+    "bytes": 8992,
+    "rig": {
+      "bones": 3,
+      "clips": [
+        "swim"
+      ],
+      "max_influences": 2
+    }
   },
   "fish_silver": {
     "triangles": 162,
     "vertices": 120,
     "unindexed_vertices": 486,
-    "bytes": 8992
+    "bytes": 8992,
+    "rig": {
+      "bones": 3,
+      "clips": [
+        "swim"
+      ],
+      "max_influences": 2
+    }
   },
   "ray": {
     "triangles": 1304,
@@ -117,7 +171,15 @@
   "mermaid": {
     "triangles": 50224,
     "bytes": 2612280,
-    "source": "assets/source/mermaid.blend"
+    "source": "assets/source/mermaid.blend",
+    "rig": {
+      "bones": 10,
+      "clips": [
+        "swim",
+        "idle"
+      ],
+      "max_influences": 2
+    }
   },
   "seabed": {
     "triangles": 12782,
@@ -144,9 +206,9 @@
     "bytes": 1380
   },
   "world": {
-    "instances": 1810,
-    "source_placements": 1820,
-    "collision_boxes": 1281,
+    "instances": 1945,
+    "source_placements": 1955,
+    "collision_boxes": 1362,
     "seed": 73
   }
 }

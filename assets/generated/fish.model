@@ -5,3 +5,6 @@ materials {
  textures { sampler: "caustics" texture: "/assets/generated/caustics.png" }
  textures { sampler: "stone_detail" texture: "/assets/textures/limestone-v1.png" }
 }
+skeleton: "/assets/generated/fish.glb"
+animations: "/assets/generated/fish.glb"
+create_go_bones: false

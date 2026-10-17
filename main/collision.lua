@@ -5,7 +5,7 @@ local seafloor=require 'main.seafloor'
 M.floor_height=seafloor.sample
 local shape={
     {0,1.60,-.28,.37}, {0,.95,-.18,.35}, {0,.30,.06,.40},
-    {0,-.40,.35,.35}, {-.18,-1.05,.95,.28}, {-.18,-1.95,1.40,.65}
+    {0,-.40,.35,.42}, {-.18,-1.05,.95,.52}, {-.18,-1.95,1.40,1.03}
 }
 function M.body(rotation)
     local body={minx=1e6,miny=1e6,minz=1e6,maxx=-1e6,maxy=-1e6,maxz=-1e6}

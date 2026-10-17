@@ -18,10 +18,10 @@ def main():
         if name not in meshes:meshes[name]=triangles(ROOT/'assets/generated'/f'{name}.glb')
         return meshes[name]
     for a in scene:
-        if a['asset'].startswith('rock') or a['asset'] in ('seabed','column','arch','ring','gateway_facade'):
+        if a['asset'].startswith('rock') or a['asset'] in ('seabed','column','arch','ring','gateway_facade','plinth'):
             world=(mesh(a['asset'])*a['s'])@rotation(a['q']).T+a['p']
             stone.append(world)
-            if a['asset'].startswith('rock'):rocks.append((a,world.reshape(-1,3)))
+            if a['asset'].startswith('rock') or a['asset']=='plinth':rocks.append((a,world.reshape(-1,3)))
     data=(ROOT/'main/obstacles.lua').read_text().removeprefix('return ').replace('{','[').replace('}',']')
     hulls=[b for b in json.loads(data) if len(b)==7]
     hull_centers=np.array([b[:3] for b in hulls]);hull_extents=np.array([b[3:6] for b in hulls])
@@ -32,7 +32,7 @@ def main():
         if outside>.035 or bound>.035:errors.append(dict(id=a['id'],outside=float(outside),bound=float(bound)))
     support=Support(np.concatenate(stone));floating=[];plants=0;worst=0
     for a in scene:
-        if a['asset'] not in ('kelp','ribbon_kelp','sponge','coral_pink','coral_blue','coral_gold'):continue
+        if a['asset'] not in ('kelp','ribbon_kelp','sponge','coral_pink','coral_blue','coral_gold','amphora'):continue
         plants+=1
         local=mesh(a['asset']).reshape(-1,3)
         roots=np.unique(np.round(local[local[:,1]<.025],3),axis=0)

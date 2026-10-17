@@ -11,8 +11,6 @@ uniform vs_uniforms {
 };
 void main() {
     vec3 origin=mtx_world[3].xyz;
-    origin.y+=sin(time_data.x*.35+origin.x+origin.z)*.20;
-    origin.x+=sin(time_data.x*.25+origin.z*.3)*.15;
     vec4 view=mtx_view*vec4(origin,1.0);
     // A two-triangle camera-facing bubble keeps a smooth analytical silhouette.
     view.xy+=position.xy*vec2(length(mtx_world[0].xyz),length(mtx_world[1].xyz));

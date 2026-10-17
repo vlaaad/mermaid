@@ -13,7 +13,6 @@ key_trigger { input: KEY_LCTRL action: "dive" }
 key_trigger { input: KEY_Q action: "dive_alt" }
 key_trigger { input: KEY_LSHIFT action: "boost" }
 key_trigger { input: KEY_R action: "reset" }
-key_trigger { input: KEY_P action: "profile" }
 
 key_trigger { input: KEY_ESC action: "release_mouse" }
 

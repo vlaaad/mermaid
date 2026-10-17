@@ -1,5 +1,6 @@
 name: "surface"
 tags: "reef"
+tags: "rigid"
 tags: "reefthin"
 vertex_program: "/render/underwater.vp"
 fragment_program: "/render/surface.fp"

@@ -1,0 +1,7 @@
+mesh: "/assets/generated/amphora.glb"
+materials {
+ name: "reef"
+ material: "/render/stone.material"
+ textures { sampler: "caustics" texture: "/assets/generated/caustics.png" }
+ textures { sampler: "stone_detail" texture: "/assets/textures/limestone-v1.png" }
+}

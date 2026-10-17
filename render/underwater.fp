@@ -81,7 +81,7 @@ vec3 fogged(vec3 shaded,float density,bool surface) {
 }
 void main() {
     if(visual_debug.x>11.5) {out_fragColor=vec4(vec3(params.x>7.5?1.0:0.0),1.0);return;}
-    if(visual_debug.x>9.5) {out_fragColor=vec4(vec3((params.x>.5 && params.x<2.5)||(params.x>5.5 && params.x<6.5)?1.0:0.0),1.0);return;}
+    if(visual_debug.x>9.5) {out_fragColor=vec4(vec3((params.x>.5 && params.x<3.5)||(params.x>5.5 && params.x<6.5)?1.0:0.0),1.0);return;}
     if(visual_debug.x>4.5 && visual_debug.x<5.5) {
         float architecture=(params.x<.5 && var_color.a<.4)?1.0:0.0;
         out_fragColor=vec4(vec3(architecture),1.0);

@@ -1,4 +1,4 @@
-"""Verify rigid plants, fish and rays match their shadow geometry and near/far ground shadows agree."""
+"""Verify skinned plants/fish and rigid rays match their shadow geometry and near/far ground shadows agree."""
 import argparse,json,sys
 from pathlib import Path
 import numpy as np
@@ -10,10 +10,11 @@ from automation_bridge import editor
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('output',type=Path)
 p.add_argument('--baseline',action='store_true')
+p.add_argument('--attach',action='store_true')
 p.add_argument('--keep-running',action='store_true')
 args=p.parse_args();args.output.mkdir(parents=True,exist_ok=True)
 project=editor.open_project(ROOT,start_if_needed=False)
-g=project.build_and_run(focus=False,timeout=180)
+g=project.connect_engine() if args.attach else project.build_and_run(focus=False,timeout=180)
 def v(x,y,z):return dict(x=x,y=y,z=z)
 def capture(name,pose,mode=0):
  g.command('mermaid.capture',pose);g.command('mermaid.lighting',dict(mode=mode,static_only=6<=mode<=9));g.wait_frames(5)
@@ -77,7 +78,7 @@ try:
  if not args.baseline:
   assert results['column_open_edges']==0,('Column mesh has holes',results)
   assert min(results[f'pass_overlap_time_{t}'] for t in (3,7))>.995,('Visible and shadow geometry differ',results)
-  assert results['visible_actor_pixels_moved']==0,('Environmental actors still animate in the shader',results)
+  assert results['visible_actor_pixels_moved']>0,('Fish skeletons did not change pose',results)
   assert max(results[f'{view}_ground_interior_disagreement'] for view in ('wide','close','back','right','left','deep'))<.001,('Near/far shadow interiors disagree',results)
 finally:
  g.command('mermaid.lighting',dict(mode=0));g.command('mermaid.capture',{})

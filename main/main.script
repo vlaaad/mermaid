@@ -1,6 +1,8 @@
 go.property("solar_flux",resource.texture("/assets/generated/sunlight_aperture.png"))
 local obstacles = require "main.obstacles"
 local collision = require "main.collision"
+local life = require "main.life"
+local currents = require "main.currents"
 local function clamp(v,a,b) return math.max(a,math.min(b,v)) end
 local function smooth(rate,dt) return 1-math.exp(-rate*dt) end
 local function wrap(a) return (a+math.pi)%(math.pi*2)-math.pi end
@@ -17,6 +19,7 @@ local function reset(self,freeze)
     self.frozen=freeze or false
     self.keys={}
     self.taps={}
+    self.pose_speed=0
     self.speed=0
     self.bank=0
     self.tilt=-.45
@@ -31,6 +34,7 @@ local function reset(self,freeze)
     self.body_cache=nil
     self.inspect_camera=nil
     self.started=false
+    if self.life then life.reset(self.life,self.time) end
 end
 
 local function camera_obstruction(anchor,arm,b)
@@ -68,6 +72,8 @@ function init(self)
     msg.post("@render:","solar_flux",{texture=resource.get_texture_info(self.solar_flux).handle})
     msg.post(".","acquire_input_focus")
     reset(self,false)
+    self.life=life.new()
+    life.reset(self.life,self.time)
     self.frames=0
     self.publish_timer=0
     self.frame_ms=0
@@ -78,8 +84,9 @@ function init(self)
         automation_bridge.command("mermaid.reset",function(data) reset(self,data.freeze~=false) return state(self) end)
         automation_bridge.command("mermaid.capture",function(data)
             reset(self,true)
+            self.pose_speed=tonumber(data.swim_speed) or 0
             if data.position then self.position=vmath.vector3(data.position.x,data.position.y,data.position.z) end
-            if data.time then self.time=data.time end
+            if data.time then self.time=data.time;life.reset(self.life,self.time) end
             if data.yaw then self.yaw=data.yaw end
             if data.pitch then self.pitch=clamp(data.pitch,-1.48,1.48) end
             if data.camera and data.look then self.inspect_camera=data end
@@ -87,6 +94,7 @@ function init(self)
         end)
         automation_bridge.command("mermaid.lighting",function(data) msg.post("@render:","lighting_debug",{mode=tonumber(data.mode) or 0,static_only=data.static_only or false}) return {mode=data.mode or 0} end)
         automation_bridge.command("mermaid.resume",function() self.frozen=false return state(self) end)
+        automation_bridge.command("mermaid.life",function() return life.state(self.life) end)
         automation_bridge.command("mermaid.floor",function(data)
             local h,nx,ny,nz=collision.floor_height(data.x,data.z)
             return {height=h,normal={x=nx,y=ny,z=nz}}
@@ -129,7 +137,7 @@ function update(self,dt)
     local input=vmath.length_sqr(desired)>0
     self.velocity=vmath.lerp(smooth(input and 4.5 or 3.4,dt),self.velocity,desired*target_speed)
     if vmath.length_sqr(self.velocity)<.0001 then self.velocity=vmath.vector3() end
-    self.speed=vmath.length(self.velocity)
+    self.speed=self.frozen and self.pose_speed or vmath.length(self.velocity)
     if input and math.abs(desired.x)+math.abs(desired.z)>.00001 then
         local target_heading=forward<0 and self.yaw or math.atan2(-desired.x,-desired.z)
         self.heading=self.heading+wrap(target_heading-self.heading)*smooth(6,dt)
@@ -140,7 +148,7 @@ function update(self,dt)
     -- Her curved authored pose already leans the head-to-fin axis forward by
     -- about .46 radians. Account for that when aligning the rigid model.
     local target_tilt=-.45*(1-swimming)+(vertical_aim-math.pi*.5+.46)*swimming
-    self.tilt=self.tilt+(target_tilt-self.tilt)*smooth(4.5,dt)
+    self.tilt=self.frozen and target_tilt or self.tilt+(target_tilt-self.tilt)*smooth(4.5,dt)
     self.bank=self.bank+(side*-.16-self.bank)*smooth(4,dt)
     -- Resolve the whole newly rotated body, even when steering beside a rock
     -- without translating. Turning cannot rotate the head or fin into stone.
@@ -151,15 +159,22 @@ function update(self,dt)
         cached={body=collision.body(rotation),heading=self.heading,tilt=self.tilt,bank=self.bank}
         self.body_cache=cached
     end
-    if changed or self.speed>0 then
+    local drift=vmath.vector3()
+    if not self.frozen then
+        local x,y,z=currents.sample(self.position.x,self.position.y,self.position.z,self.time)
+        drift=vmath.vector3(x,y,z)
+    end
+    if changed or self.speed>0 or not self.frozen then
         local steps=math.max(1,math.ceil(dt/.025))
-        for _=1,steps do self.position=collision.resolve(self.position+self.velocity*(dt/steps),cached.body) end
+        for _=1,steps do self.position=collision.resolve(self.position+(self.velocity+drift)*(dt/steps),cached.body) end
     end
     if not self.frozen then self.time=self.time+dt end
     local bank,tilt=self.bank,self.tilt
     go.set_position(self.position,"/player")
     go.set_rotation(vmath.quat_rotation_y(self.heading)*vmath.quat_rotation_z(bank-.12)*vmath.quat_rotation_x(tilt),"/player")
     go.set_scale(.85,"/player")
+    local rotation=vmath.quat_rotation_y(self.heading)*vmath.quat_rotation_z(bank-.12)*vmath.quat_rotation_x(tilt)
+    life.update(self.life,dt,self.time,self.position,rotation,self.speed,cached.body,self.frozen)
     local offset=vmath.vector3(math.sin(self.yaw)*9*math.cos(self.pitch),1.36-math.sin(self.pitch)*9,math.cos(self.yaw)*9*math.cos(self.pitch))
     local desired_camera=self.position+offset+vmath.vector3(.6,0,0)
     desired_camera.y=math.min(49,desired_camera.y)
@@ -200,14 +215,6 @@ function update(self,dt)
     end
     local view=vmath.matrix4_look_at(self.camera,look,vmath.vector3(0,1,0))
     msg.post("@render:","scene_camera",{view=view,shadow_focus=self.position,position=vmath.vector4(self.camera.x,self.camera.y,self.camera.z,1),time_data=vmath.vector4(self.time,self.speed,0,0)})
-    if not html5 then
-        local visible=not self.frozen
-        local hint=(self.steering or window.get_mouse_lock()) and "Mouse steer   |   W swim   |   Shift boost   |   Tab release" or "Click to steer   |   W swim   |   Shift boost   |   Tab release"
-        local controls=visible and hint or ""
-        local depth=visible and string.format("%d m",math.floor(50-self.position.y+.5)) or ""
-        if self.hud_controls~=controls then go.set("/controls#label","text",controls);self.hud_controls=controls end
-        if self.hud_depth~=depth then go.set("/depth#label","text",depth);self.hud_depth=depth end
-    end
     self.publish_timer=self.publish_timer+dt
     if self.publish_timer>=.2 then
         self.publish_timer=0
@@ -256,10 +263,6 @@ function on_input(self,id,action)
         self.frozen=false;self.started=true
     end
     if id==hash("reset") and action.pressed then reset(self,false) end
-    if id==hash("profile") and action.pressed then
-        self.show_profile=not self.show_profile
-        profiler.enable_ui(self.show_profile)
-    end
     if id then
         if action.pressed then self.last_input=tostring(id) end
         if action.pressed then self.keys[id]=true self.taps[id]=.08 end

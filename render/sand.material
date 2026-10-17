@@ -1,5 +1,6 @@
 name: "sand"
 tags: "reef"
+tags: "rigid"
 tags: "reefsolid"
 tags: "caster8"
 vertex_program: "/render/underwater.vp"

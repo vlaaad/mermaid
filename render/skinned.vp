@@ -1,0 +1,60 @@
+#version 140
+in highp vec4 position;
+in mediump vec3 normal;
+in mediump vec4 color;
+in mediump vec2 texcoord0;
+in highp mat4 mtx_world;
+in mediump vec4 bone_weights;
+in mediump vec4 bone_indices;
+in highp vec4 animation_data;
+uniform highp sampler2D pose_matrix_cache;
+out highp vec3 var_world;
+out mediump vec3 var_normal;
+out mediump vec4 var_color;
+out mediump vec2 var_uv;
+out highp float var_depth;
+out mediump vec3 var_local;
+uniform vs_uniforms {
+    highp mat4 mtx_view;
+    highp mat4 mtx_proj;
+};
+// Genuine skinning: the engine uploads sampled skeletal poses. Every pass uses
+// this same vertex program. Two influences share matrix fetches with normals.
+mat4 joint_matrix(int joint) {
+    int start=int(animation_data.x)+joint*3;
+    vec4 rows[3];
+    for(int i=0;i<3;i++) {
+        int index=start+i;
+        vec2 uv=(vec2(mod(float(index),animation_data.z),floor(float(index)/animation_data.z))+.5)/animation_data.zw;
+        rows[i]=texture(pose_matrix_cache,uv);
+    }
+    return mat4(vec4(rows[0].xyz,0),vec4(rows[1].xyz,0),vec4(rows[2].xyz,0),vec4(rows[0].w,rows[1].w,rows[2].w,1));
+}
+void main() {
+    vec4 p=vec4(position.xyz,1.0);
+    vec3 n=normal;
+#ifndef EDITOR
+    if(animation_data.y>0.0) {
+        mat4 skin;
+        // Most body vertices have one influence. Avoid a second palette read
+        // for zero weights while preserving the full two-joint blend at bends.
+        if(bone_weights.y==0.0 || bone_indices.x==bone_indices.y)
+            skin=joint_matrix(int(bone_indices.x));
+        else if(bone_weights.x==0.0)
+            skin=joint_matrix(int(bone_indices.y));
+        else
+            skin=joint_matrix(int(bone_indices.x))*bone_weights.x+joint_matrix(int(bone_indices.y))*bone_weights.y;
+        p=skin*p;n=mat3(skin)*n;
+    }
+#endif
+    vec4 world = mtx_world * p;
+    vec3 scale2 = vec3(dot(mtx_world[0].xyz,mtx_world[0].xyz),dot(mtx_world[1].xyz,mtx_world[1].xyz),dot(mtx_world[2].xyz,mtx_world[2].xyz));
+    var_normal = normalize(mat3(mtx_world) * (n / max(scale2, vec3(0.0001))));
+    var_world = world.xyz;
+    var_color = color;
+    var_uv = texcoord0;
+    var_local = position.xyz;
+    vec4 view = mtx_view * world;
+    var_depth = -view.z;
+    gl_Position = mtx_proj * view;
+}

@@ -9,11 +9,6 @@
 <style>
 *{box-sizing:border-box}[hidden]{display:none!important}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#071e2e;color:#d9f3f4;font-family:system-ui,sans-serif}body{display:grid;place-items:center}
 #app-container{position:relative}#canvas{display:block;width:100%;height:100%;outline:none}#canvas-container{width:100%;height:100%}
-#identity{position:absolute;left:30px;top:25px;pointer-events:none;text-shadow:0 2px 12px #163e4e66;transition:opacity 1s}#identity small{font-size:9px;letter-spacing:.35em;opacity:.65}#identity h1{font-family:Georgia,serif;font-size:26px;font-weight:400;letter-spacing:.20em;margin:5px 0}
-#controls{position:absolute;bottom:24px;left:30px;font-size:11px;letter-spacing:.06em;text-shadow:0 2px 5px #073146;opacity:.72;pointer-events:none}#controls kbd{font:inherit;color:#fff}
-#fullscreen{position:absolute;right:24px;bottom:20px;color:#ddf8f7;background:#123c4e44;border:1px solid #c8ffff33;border-radius:4px;padding:6px 10px;font-size:10px;cursor:pointer}
-#depth{position:absolute;right:28px;top:26px;font-size:12px;letter-spacing:.08em;opacity:.8;pointer-events:none;text-shadow:0 2px 5px #073146}
-#loading{position:absolute;inset:0;display:grid;place-content:center;background:#0d344b;font-size:13px;letter-spacing:.12em;pointer-events:none}
 #debug{display:none;position:absolute;right:15px;top:15px;padding:12px;background:#061a2de6;font:11px/1.5 monospace;white-space:pre;max-width:400px;pointer-events:none;color:#d7fff2}
 #save-frame{position:absolute;right:15px;top:210px;padding:8px 12px;background:#123747;color:#caffed;border:1px solid #9cdbd777;border-radius:4px;cursor:pointer}
 </style>
@@ -21,11 +16,6 @@
 <body>
 <main id="app-container">
  <div id="canvas-container"><canvas id="canvas" tabindex="0" width="{{display.width}}" height="{{display.height}}" aria-label="Underwater Atlantis game"></canvas></div>
- <div id="identity"><small>THE SUNKEN CITY</small><h1>ATLANTIS</h1></div>
- <output id="depth" aria-label="Depth below surface"></output>
- <div id="controls">Click to steer &nbsp; · &nbsp; Mouse aim &nbsp; · &nbsp; <kbd>W</kbd> swim &nbsp; · &nbsp; <kbd>Tab / Esc</kbd> release &nbsp; · &nbsp; <kbd>Shift</kbd> boost &nbsp; · &nbsp; <kbd>R</kbd> return</div>
- <button id="fullscreen" aria-label="Fullscreen">⤢ Fullscreen</button>
- <div id="loading">DRIFTING INTO ATLANTIS…</div>
  <output id="debug" aria-label="Developer performance and state"></output>
  <button id="save-frame" hidden>Save frame and timings</button>
 </main>
@@ -34,7 +24,6 @@
 const query=new URLSearchParams(location.search);
 const capture=query.has('capture');
 const debug=query.has('debug');
-if(capture){document.querySelector('#identity').hidden=true;document.querySelector('#controls').hidden=true;document.querySelector('#fullscreen').hidden=true;document.querySelector('#depth').hidden=true;}
 const debugPanel=document.querySelector('#debug');
 if(debug)debugPanel.style.display='block';
 const saveButton=document.querySelector('#save-frame');
@@ -49,11 +38,10 @@ CUSTOM_PARAMETERS.resize_window_callback=function(){
  const rh=Math.round(rw*9/16);
  if(canvas.width!==rw||canvas.height!==rh){canvas.width=rw;canvas.height=rh;}
 };
-CUSTOM_PARAMETERS.update_progress=p=>{document.querySelector('#loading').textContent='DRIFTING INTO ATLANTIS… '+Math.round(p)+'%';};
-CUSTOM_PARAMETERS.start_error=e=>{document.querySelector('#loading').textContent='Unable to enter Atlantis: '+e;};
+CUSTOM_PARAMETERS.update_progress=()=>{};
+CUSTOM_PARAMETERS.start_error=e=>console.error('Unable to enter Atlantis:',e);
 if(query.has('trace'))CUSTOM_PARAMETERS.engine_arguments.push('--config=profiler.performance_timeline_enabled=1');
 CUSTOM_PARAMETERS.engine_arguments.push('--config=display.update_frequency=0');
-document.querySelector('#fullscreen').addEventListener('click',()=>document.querySelector('#app-container').requestFullscreen());
 document.querySelector('#canvas').addEventListener('contextmenu',e=>e.preventDefault());
 // Request in the browser's user gesture. The engine receives mouse input on
 // its following frame, after the transient activation may have expired.
@@ -72,9 +60,6 @@ setInterval(()=>{
  const s=window.mermaidState;
  if(!s||!s.ready)return;
  if(!wasReady){deltas=[];previous=0;wasReady=true;}
- document.querySelector('#loading').hidden=true;
- document.querySelector('#depth').textContent=Math.round(s.depth)+' m';
- if(s.speed>.1)document.querySelector('#identity').style.opacity='0';
  if(debug){
   const sorted=[...deltas].sort((a,b)=>a-b),avg=deltas.reduce((a,b)=>a+b,0)/Math.max(1,deltas.length);
   const canvas=document.querySelector('#canvas');

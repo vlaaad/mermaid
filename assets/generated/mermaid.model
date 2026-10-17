@@ -5,3 +5,5 @@ materials {
  textures { sampler: "caustics" texture: "/assets/generated/caustics.png" }
  textures { sampler: "stone_detail" texture: "/assets/textures/limestone-v1.png" }
 }
+skeleton: "/assets/generated/mermaid.glb"
+animations: "/assets/generated/mermaid.glb"

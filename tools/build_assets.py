@@ -15,6 +15,8 @@ import struct
 import numpy as np
 from PIL import Image
 import bathymetry
+import deep_details
+from rig_assets import rig
 from water_patterns import caustics as bake_caustics, surface_normals, sunlight_aperture
 from world_geometry import triangles as read_triangles, rotation as rotation_matrix, convex_collider, Support
 
@@ -616,6 +618,8 @@ def main():
         # Debug semantic ID only. Normal output stays opaque; no lighting baked in.
         mesh.c=[(*c[:3],part_id) for c in mesh.c]
         mesh.save(name)
+    deep_details.amphora(Mesh).save('amphora','stone')
+    plinth=Mesh();plinth.box((0,-.4,0),(1,.8,1),(.18,.32,.39),.025);plinth.save('plinth','stone')
     kelp().save('kelp','kelp')
     ribbon_kelp().save('ribbon_kelp','kelp')
     coral((.54,.28,.57),True).save('sponge','stone')
@@ -670,7 +674,17 @@ def main():
     finish_character()
     finish_ruins()
     finish_foreground_stone()
-    stone_names=[*(f'rock{i}' for i in range(4)),'rock3_detail','seabed','column','arch','ring','gateway_facade']
+    for name,kind in [("mermaid","mermaid"),("kelp","plant"),("ribbon_kelp","plant"),("fish","fish"),("fish_blue","fish"),("fish_orange","fish"),("fish_silver","fish")]:
+        STATS[name]["rig"]=rig(OUT/f"{name}.glb",kind)
+    rig_source=ROOT/'tools/save_living_rigs.py'
+    rig_cache=ROOT/'assets/source/living-rigs-build.json'
+    signature=hashlib.sha256(rig_source.read_bytes()+b''.join((OUT/f'{name}.glb').read_bytes() for name in ['mermaid','kelp','ribbon_kelp','fish'])).hexdigest()
+    cached=json.loads(rig_cache.read_text()) if rig_cache.exists() else {}
+    if cached.get('signature')!=signature:
+        subprocess.run([shutil.which('blender') or '/snap/bin/blender','--background','--python',str(rig_source),'--',str(ROOT)],check=True)
+        rig_cache.write_text(json.dumps({'signature':signature},indent=2)+'\n')
+
+    stone_names=[*(f'rock{i}' for i in range(4)),'rock3_detail','seabed','column','arch','ring','gateway_facade','plinth']
     stone_meshes={name:read_triangles(OUT/f'{name}.glb') for name in stone_names}
     objects=[]; obstacles=[]; placed=[]; support_triangles=[]
     def instance(name,asset,p,q,scale):
@@ -697,7 +711,7 @@ def main():
         if asset in stone_meshes:
             world=(stone_meshes[asset]*vec(scale))@rotation_matrix(q).T+vec(p)
             support_triangles.append(world)
-            if asset.startswith('rock'):
+            if asset.startswith('rock') or asset=='plinth':
                 # Every rock, including lintels and the detailed foreground block,
                 # gets its actual transformed hull instead of a smaller guessed box.
                 hull=world if asset!='rock3_detail' else (stone_meshes['rock3']*vec(scale))@rotation_matrix(q).T+vec(p)
@@ -910,6 +924,8 @@ def main():
     rock_top=max(p[1] for p in make_rock(103).p)
     place('rock3_detail',outcrop_top-vec((0,rock_top*3.7,0)),(2.10,3.7,1.80),.12,True,label='foreground_outcrop')
     bathymetry.populate(place)
+    deep_landmarks=deep_details.populate(place)
+    (ROOT/"assets/source/deep-landmarks.json").write_text(json.dumps(deep_landmarks,indent=2)+"\n")
     # Remove only obsolete outputs from the abandoned mesh-baking experiment.
     for stale in list(OUT.glob('ruins_chunk_*')) + [OUT/(n+ext) for n in ('fish_field','fish_blue_field','dust_field') for ext in ('.glb','.model','.go')]:
         if stale.suffix in ('.glb','.model','.go') and stale.exists():stale.unlink()
@@ -920,7 +936,7 @@ def main():
     planting=[]
     for actor in placed:
         asset=actor['asset']
-        if asset not in ('kelp','ribbon_kelp','sponge','coral_pink','coral_blue','coral_gold'):continue
+        if asset not in ('kelp','ribbon_kelp','sponge','coral_pink','coral_blue','coral_gold','amphora'):continue
         p=actor['p'];scale=actor['scale'];original=p.copy()
         if asset not in plant_roots:
             vertices=read_triangles(OUT/f'{asset}.glb').reshape(-1,3)
@@ -941,8 +957,17 @@ def main():
             if spread<.12*scale[1]:break
         if best is None:raise ValueError(f'No support for {actor["name"]}')
         _,p,h=best;p[1]=h-.10*min(scale[1],1.5)
+        actor['p']=p
         objects[actor['index']]=instance(actor['name'],asset,p,actor['q'],scale)
         planting.append(dict(id=actor['name'],asset=asset,original=original.tolist(),position=p.tolist(),support_height=h,root_gap=float(p[1]-h)))
+    # Runtime controls these same independent actors; no duplicate fish/foliage.
+    living=[]
+    for actor in placed:
+        asset=actor['asset']
+        if not (asset.startswith('fish') or asset in ('kelp','ribbon_kelp','particle','ray')):continue
+        p=actor['p'];q=actor['q'];scale=actor['scale']
+        living.append('{id="/reef/%s",asset="%s",p={%s},q={%s},s={%s}}'%(actor['name'],asset,','.join(f'{v:.6f}' for v in p),','.join(f'{v:.6f}' for v in q),','.join(f'{v:.6f}' for v in scale)))
+    (ROOT/'main/living_world.lua').write_text('-- Generated actor anchors, shared by deterministic simulations.\nreturn {\n'+',\n'.join(living)+'\n}\n')
     (ROOT/'assets/source/plant-support.json').write_text(json.dumps(planting,indent=2)+'\n')
     (ROOT/'assets/source/landmarks.json').write_text(json.dumps(landmark_records,indent=2)+'\n')
     (ROOT/'main/world.collection').write_text('name: "world"\n'+ '\n'.join(objects)+'\n')
