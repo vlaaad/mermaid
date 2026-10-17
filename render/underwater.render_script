@@ -16,6 +16,7 @@ function init(self)
     self.solid=render.predicate({"reefsolid"})
     self.thin=render.predicate({"reefthin"})
     self.rigid=render.predicate({"rigid"})
+    self.surface=render.predicate({"surface"})
     self.skinned=render.predicate({"skinned"})
     self.bubbles=render.predicate({"bubbles"})
     self.casters={}
@@ -28,6 +29,7 @@ function init(self)
     self.constants.antialias=vmath.vector4(self.fxaa and 1 or 0,0,0,0)
     print("SCENE_AA "..(self.fxaa and "FXAA" or (self.scene_samples>1 and "MSAA x"..self.scene_samples or "OFF")))
     self.constants.time_data=vmath.vector4(3,0,0,0)
+    self.constants.surface_time=vmath.vector4(3,0,0,0)
     self.constants.camera_pos=vmath.vector4(0,7,13,1)
     self.constants.fog_settings=vmath.vector4(0.062500,0.625000,0.945500,.0165)
     self.shadow=target(2048,2048,true)
@@ -196,6 +198,8 @@ function update(self)
         render.draw(self.rigid,{frustum=projection*self.view})
         render.enable_material("scene_depth_skinned")
         render.draw(self.skinned,{frustum=projection*self.view})
+        render.enable_material("scene_depth_surface")
+        render.draw(self.surface,{constants=self.constants,frustum=projection*self.view})
         render.disable_material()
         render.disable_state(graphics.STATE_DEPTH_TEST)
         render.set_depth_mask(false)
@@ -241,6 +245,7 @@ function on_message(self,id,message)
         self.view=message.view
         self.constants.camera_pos=message.position
         self.constants.time_data=message.time_data
+        self.constants.surface_time=message.time_data
         self.shadow_focus=message.shadow_focus or self.shadow_focus
     end
 end

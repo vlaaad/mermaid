@@ -1,7 +1,7 @@
 #version 140
 #include "/render/water_depth.glsl"
 in highp vec3 var_world;
-in highp float var_depth;
+in highp vec2 var_slope;
 out vec4 out_fragColor;
 uniform mediump sampler2D caustics;
 uniform fs_uniforms {
@@ -17,9 +17,7 @@ vec3 surfaceColor(float t) {
     highp vec2 a=texture(caustics,p*.085+vec2(t*.0038,-t*.0021)).rg*2.0-1.0;
     highp vec2 b=texture(caustics,mat2(.80,-.60,.60,.80)*p*.16+vec2(-t*.0033,t*.0036)).rg*2.0-1.0;
     b=mat2(.80,.60,-.60,.80)*b;
-    highp vec2 slope=a*.85+b*.35;
-    slope+=vec2(.075,.030)*cos(dot(p,vec2(.48,.19))-t*.62);
-    slope+=vec2(-.025,.055)*cos(dot(p,vec2(-.24,.53))-t*.85);
+    highp vec2 slope=var_slope+a*.55+b*.24;
     highp vec3 n=normalize(vec3(slope.x,-1.0,slope.y));
     highp vec3 incident=normalize(var_world-camera_pos.xyz);
     highp float cosI=clamp(dot(-incident,n),.0001,1.0);
@@ -55,6 +53,9 @@ void main() {
     vec3 color=surfaceColor(time_data.x);
     vec3 ray=normalize(var_world-camera_pos.xyz);
     vec3 fog=mix(vec3(.061,.485,.875),fog_settings.rgb,clamp(ray.y*.9+.42,0.0,1.0));
+    // Match the open-water background at the distant clipping boundary.
+    float sunAlignment=max(dot(ray,normalize(vec3(.35,.90,-.24))),0.0);
+    fog+=vec3(.012,.035,.04)*sunAlignment*sunAlignment*sunAlignment*sunAlignment*sunAlignment;
     float travel=length(var_world-camera_pos.xyz);
     float transmission=exp(-max(travel-3.0,0.0)*fog_settings.w);
     out_fragColor=vec4(color*transmission+fog*waterScattering(camera_pos.y,var_world.y,travel,fog_settings.w),1.0);

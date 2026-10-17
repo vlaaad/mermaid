@@ -1,0 +1,200 @@
+[
+  {
+    "id": "main_pillar_footing_0",
+    "supports": "main_pillar",
+    "top": 8.087068721250116,
+    "bottom": -4.5616676630738215
+  },
+  {
+    "id": "left_front_pillar_footing_0",
+    "supports": "left_front_pillar",
+    "top": 5.2607610883651095,
+    "bottom": -4.640057511795469
+  },
+  {
+    "id": "left_rear_pillar_footing_0",
+    "supports": "left_rear_pillar",
+    "top": 4.160464660664543,
+    "bottom": -4.473262540311728
+  },
+  {
+    "id": "left_distant_pillar_footing_0",
+    "supports": "left_distant_pillar",
+    "top": 4.955647373508297,
+    "bottom": -4.644949036635088
+  },
+  {
+    "id": "left_distant_pillar_pair_footing_0",
+    "supports": "left_distant_pillar_pair",
+    "top": 4.7892217108591275,
+    "bottom": -4.663295412079627
+  },
+  {
+    "id": "central_distant_pillar_footing_0",
+    "supports": "central_distant_pillar",
+    "top": 1.5653470731007746,
+    "bottom": -4.646636799352099
+  },
+  {
+    "id": "pillar_behind_main_footing_0",
+    "supports": "pillar_behind_main",
+    "top": 7.685380415299738,
+    "bottom": -4.484987477140669
+  },
+  {
+    "id": "ring_left_pillar_footing_0",
+    "supports": "ring_left_pillar",
+    "top": 8.46105188549034,
+    "bottom": -4.518726457427549
+  },
+  {
+    "id": "right_rear_pillar_footing_0",
+    "supports": "right_rear_pillar",
+    "top": 16.43659272948651,
+    "bottom": -4.639097597943625
+  },
+  {
+    "id": "central_gateway_footing_0",
+    "supports": "central_gateway",
+    "top": 0.20008907738256426,
+    "bottom": -4.5881836490735495
+  },
+  {
+    "id": "central_gateway_footing_1",
+    "supports": "central_gateway",
+    "top": 0.1982800816290376,
+    "bottom": -4.623395706867348
+  },
+  {
+    "id": "ring_gateway_footing_0",
+    "supports": "ring_gateway",
+    "top": 3.724320896121266,
+    "bottom": -4.606675391214749
+  },
+  {
+    "id": "ring_gateway_footing_1",
+    "supports": "ring_gateway",
+    "top": 3.724320896121266,
+    "bottom": -4.6462736706809356
+  },
+  {
+    "id": "ring_gateway_footing_2",
+    "supports": "ring_gateway",
+    "top": 3.7299938974553375,
+    "bottom": -4.588864505665285
+  },
+  {
+    "id": "ring_gateway_footing_3",
+    "supports": "ring_gateway",
+    "top": 3.7227243991220025,
+    "bottom": -4.554737647109375
+  },
+  {
+    "id": "ring_gateway_footing_4",
+    "supports": "ring_gateway",
+    "top": 4.836523405055108,
+    "bottom": -4.534565790970439
+  },
+  {
+    "id": "ring_gateway_footing_5",
+    "supports": "ring_gateway",
+    "top": 4.841359413007798,
+    "bottom": -4.57679607991392
+  },
+  {
+    "id": "ring_gateway_footing_6",
+    "supports": "ring_gateway",
+    "top": 4.824417910317483,
+    "bottom": -4.572826807795811
+  },
+  {
+    "id": "column_1389_footing_0",
+    "supports": "column_1389",
+    "top": 15.1,
+    "bottom": -4.663032233747495
+  },
+  {
+    "id": "column_1390_footing_0",
+    "supports": "column_1390",
+    "top": 15.1,
+    "bottom": -4.498963218623638
+  },
+  {
+    "id": "column_1392_footing_0",
+    "supports": "column_1392",
+    "top": 12.1,
+    "bottom": -4.633017808898446
+  },
+  {
+    "id": "arch_1393_footing_0",
+    "supports": "arch_1393",
+    "top": 5.245762497559189,
+    "bottom": -4.5788143132113515
+  },
+  {
+    "id": "arch_1393_footing_1",
+    "supports": "arch_1393",
+    "top": 5.243250003457069,
+    "bottom": -4.558178988245297
+  },
+  {
+    "id": "column_1394_footing_0",
+    "supports": "column_1394",
+    "top": 0.1,
+    "bottom": -4.666821109136811
+  },
+  {
+    "id": "column_1395_footing_0",
+    "supports": "column_1395",
+    "top": 5.1,
+    "bottom": -4.650810621062556
+  },
+  {
+    "id": "arch_1396_footing_0",
+    "supports": "arch_1396",
+    "top": 3.228270997852087,
+    "bottom": -4.532879172789594
+  },
+  {
+    "id": "arch_1396_footing_1",
+    "supports": "arch_1396",
+    "top": 3.226060003042221,
+    "bottom": -4.474793629894028
+  },
+  {
+    "id": "arch_1728_footing_0",
+    "supports": "arch_1728",
+    "top": -27.55488672960199,
+    "bottom": -28.52946440095949
+  },
+  {
+    "id": "arch_1732_footing_0",
+    "supports": "arch_1732",
+    "top": -81.6828367697059,
+    "bottom": -82.49844311407905
+  },
+  {
+    "id": "arch_1732_footing_1",
+    "supports": "arch_1732",
+    "top": -81.68645476121296,
+    "bottom": -83.21723514129663
+  },
+  {
+    "id": "gateway_facade_1870_footing_0",
+    "supports": "gateway_facade_1870",
+    "top": -79.77628664737315,
+    "bottom": -80.74788382928138
+  },
+  {
+    "id": "gateway_facade_1870_footing_1",
+    "supports": "gateway_facade_1870",
+    "top": -79.77379064326854,
+    "bottom": -80.86375038359957
+  },
+  {
+    "id": "gateway_facade_1870_footing_2",
+    "supports": "gateway_facade_1870",
+    "top": -79.78253464465709,
+    "bottom": -80.90328485382821
+  }
+]

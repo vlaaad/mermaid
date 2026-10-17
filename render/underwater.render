@@ -12,3 +12,4 @@ render_resources { name: "scene_depth" path: "/render/scene_depth.material" }
 render_resources { name: "shadow_skinned" path: "/render/shadow_skinned.material" }
 render_resources { name: "shadow_moments_skinned" path: "/render/shadow_moments_skinned.material" }
 render_resources { name: "scene_depth_skinned" path: "/render/scene_depth_skinned.material" }
+render_resources { name: "scene_depth_surface" path: "/render/scene_depth_surface.material" }

@@ -61,4 +61,18 @@ def populate(place):
         for i in range(14):
             x=cx+rng.gauss(0,2);z=cz+rng.gauss(0,2)
             place('fish_blue',(x,mesh_height(x,z)+rng.uniform(4,8),z),rng.uniform(.5,.8),.2)
+    # Small habitats along the descent and around the lower discoveries. Each
+    # has several distinct, current-responsive plants and its own loose school.
+    for site,(cx,cz) in enumerate([(-17,42),(13,46),(-17,76),(22,79)]):
+        for i in range(3):
+            a=i*math.tau/3+site*.7
+            ground('ribbon_kelp' if i==1 else 'kelp',cx+math.cos(a)*3,cz+math.sin(a)*2,
+                   rng.uniform(.85,1.35),a,label=f'deep_garden_{site}_plant_{i}')
+            ground(['coral_pink','sponge','coral_gold'][i],cx+math.cos(a)*1.6,cz+math.sin(a)*1.4,
+                   rng.uniform(.9,1.6),a,label=f'deep_garden_{site}_coral_{i}')
+        for i in range(5):
+            # Distributed starting positions preserve the schools' body space.
+            x=cx+(i%3-1)*2.2;z=cz+(i//3-.5)*2.2
+            place('fish_silver' if site%2 else 'fish_blue',(x,mesh_height(x,z)+4+(i%3)*.8,z),
+                  rng.uniform(.6,.85),site*.7,label=f'deep_garden_{site}_fish_{i}')
     return landmarks

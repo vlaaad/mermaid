@@ -17,6 +17,7 @@ from PIL import Image
 import bathymetry
 import deep_details
 import sea_animals
+from architecture_support import footing_sites
 from rig_assets import rig
 from water_patterns import caustics as bake_caustics, surface_normals, sunlight_aperture
 from world_geometry import triangles as read_triangles, rotation as rotation_matrix, convex_collider, Support
@@ -611,6 +612,19 @@ def finish_foreground_stone():
     finish_stone_meshes(['rock3_detail'],'rocks')
 
 
+def water_surface():
+    surface=Mesh()
+    # A shared water grid, with coarse outer skirts beyond the swimming area.
+    # Broad waves move vertices; fine ripples remain filtered normal detail.
+    xs=[-1000,-400,*range(-168,169,3),400,1000]
+    zs=[-1000,-400,*range(-216,121,3),400,1000]
+    for x,xx in zip(xs,xs[1:]):
+        for z,zz in zip(zs,zs[1:]):
+            # Optics use world coordinates, so avoid redundant per-cell UV seams.
+            surface.quad((x,50,z),(xx,50,z),(xx,50,zz),(x,50,zz),(.12,.64,.83),uv=[(0,0)]*4)
+    return surface
+
+
 def main():
     OUT.mkdir(parents=True,exist_ok=True)
     for i in range(4): make_rock(100+i).save(f'rock{i}')
@@ -639,9 +653,7 @@ def main():
     mermaid().save('mermaid','mermaid')
     bathymetry.mesh(Mesh).save('seabed','sand')
     bathymetry.export_collision(ROOT/'main/seafloor.lua')
-    surface=Mesh()
-    surface.quad((-1000,50,200),(1000,50,200),(1000,50,-1000),(-1000,50,-1000),(.12,.64,.83))
-    surface.save('surface','surface')
+    water_surface().save('surface','surface')
     particle=Mesh()
     particle.quad((-.025,-.025,0),(.025,-.025,0),(.025,.025,0),(-.025,.025,0),(1,1,1))
     particle.save('particle','dust')
@@ -799,6 +811,9 @@ def main():
     landmark_records=[]
     def landmark(asset,u,v,depth,scale,label=None,yaw=0):
         p=at(u,v,depth)
+        if label=='circular_window':
+            arcade=at(.701,.495,66)
+            p[0],p[2]=arcade[0],arcade[2]
         place(asset,p,scale,yaw=yaw,label=label)
         if label:
             landmark_records.append({'id':label,'asset':asset,'reference_anchor_uv':[u,v],
@@ -827,14 +842,14 @@ def main():
         ('right_rear_pillar',.855,.36,91,(1.2,3.1,1.2)),
     ]:
         p=landmark('column',u,v,d,scale,label)
-        if label not in ['ring_left_pillar','right_rear_pillar']:
-            height=max(.2,float(p[1])+4.25)
-            place('rock1',(p[0],-4.25+height*.5,p[2]),(1.25,height,1.25),0,True)
+        # Continuous masonry footings are fitted to the final stone below.
+        # Preserve the subsequent authored instance names.
+        if label not in ['ring_left_pillar','right_rear_pillar']:placements+=1
 
     gateway=at(.536,.555,58)
     terrace(float(gateway[0]),float(gateway[2]),3.4,2.8,float(gateway[1])-.1,3)
     landmark('arch',.536,.555,58,(.83,.90,.83),'central_gateway')
-    landmark('gateway_facade',.701,.495,66,(1.75,1.55,1.55),'ring_gateway',yaw=.35)
+    landmark('gateway_facade',.701,.495,66,(1.90,1.55,1.75),'ring_gateway',yaw=.35)
     landmark('ring',.701,.245,66,(1.5,1.5,1.5),'circular_window',yaw=.35)
     # Square wall supports continue down to the temple shelf, leaving the arch open.
     ring=at(.701,.245,66)
@@ -929,6 +944,20 @@ def main():
     bathymetry.populate(place)
     deep_landmarks=deep_details.populate(place)
     (ROOT/"assets/source/deep-landmarks.json").write_text(json.dumps(deep_landmarks,indent=2)+"\n")
+    # Architecture must stand on the level too. Excluding each actor's own
+    # triangles prevents its capital from being mistaken for its foundation.
+    stone_actors=[a for a in placed if a['asset'] in stone_meshes]
+    owners=np.concatenate([np.full(len(t),a['name']) for a,t in zip(stone_actors,support_triangles)])
+    masonry_support=Support(np.concatenate(support_triangles),owners)
+    footings=[]
+    for actor in list(placed):
+        if actor['asset'] not in ('column','arch','gateway_facade'):continue
+        yaw=2*math.atan2(actor['q'][1],actor['q'][3])
+        for i,(x,top,z,sx,sy,sz) in enumerate(footing_sites(actor,stone_meshes[actor['asset']],masonry_support)):
+            name=actor['name']+'_footing_'+str(i)
+            place('plinth',(x,top,z),(sx,sy,sz),yaw,label=name)
+            footings.append(dict(id=name,supports=actor['name'],top=top,bottom=top-sy*.8))
+    (ROOT/'assets/source/architecture-support.json').write_text(json.dumps(footings,indent=2)+'\n')
     # Remove only obsolete outputs from the abandoned mesh-baking experiment.
     for stale in list(OUT.glob('ruins_chunk_*')) + [OUT/(n+ext) for n in ('fish_field','fish_blue_field','dust_field') for ext in ('.glb','.model','.go')]:
         if stale.suffix in ('.glb','.model','.go') and stale.exists():stale.unlink()

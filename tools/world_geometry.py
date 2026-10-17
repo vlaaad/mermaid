@@ -44,7 +44,8 @@ def convex_collider(tri):
 
 
 class Support:
-    def __init__(self,tri):
+    def __init__(self,tri,owners=None):
+        self.owners=np.asarray(owners) if owners is not None else None
         self.a=tri[:,0];self.ab=tri[:,1]-self.a;self.ac=tri[:,2]-self.a
         normal=np.cross(self.ab,self.ac)
         self.det=self.ab[:,0]*self.ac[:,2]-self.ab[:,2]*self.ac[:,0]
@@ -59,12 +60,15 @@ class Support:
             for x in range(lx,hx+1):
                 for z in range(lz,hz+1):self.cells.setdefault((x,z),[]).append(i)
         self.cells={key:np.array(value+self.global_triangles,dtype=int) for key,value in self.cells.items()}
-    def height(self,x,z,near):
+    def height(self,x,z,near,exclude=None,ceiling=None):
         ids=self.cells.get((math.floor(x/8),math.floor(z/8)),self.global_triangles)
+        if exclude is not None and self.owners is not None:
+            ids=np.asarray(ids);ids=ids[self.owners[ids]!=exclude]
         a,ab,ac=self.a[ids],self.ab[ids],self.ac[ids]
         dx=x-a[:,0];dz=z-a[:,2]
         u=(dx*ac[:,2]-dz*ac[:,0])/self.safe[ids]
         v=(ab[:,0]*dz-ab[:,2]*dx)/self.safe[ids]
         hit=(u>=-1e-6)&(v>=-1e-6)&(u+v<=1.000001)
         h=(a[:,1]+u*ab[:,1]+v*ac[:,1])[hit]
+        if ceiling is not None:h=h[h<=ceiling]
         return float(h[np.argmin(abs(h-near))]) if len(h) else None

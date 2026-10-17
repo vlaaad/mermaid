@@ -175,6 +175,19 @@
       "max_influences": 2
     }
   },
+  "whale": {
+    "triangles": 1268,
+    "vertices": 1900,
+    "unindexed_vertices": 3804,
+    "bytes": 107700,
+    "rig": {
+      "bones": 8,
+      "clips": [
+        "swim"
+      ],
+      "max_influences": 2
+    }
+  },
   "mermaid": {
     "triangles": 50224,
     "bytes": 2612280,
@@ -196,10 +209,10 @@
     "bytes": 1995244
   },
   "surface": {
-    "triangles": 2,
-    "vertices": 4,
-    "unindexed_vertices": 6,
-    "bytes": 1384
+    "triangles": 26912,
+    "vertices": 13689,
+    "unindexed_vertices": 80736,
+    "bytes": 981244
   },
   "particle": {
     "triangles": 2,
@@ -214,23 +227,10 @@
     "bytes": 1380
   },
   "world": {
-    "instances": 1945,
-    "source_placements": 1955,
-    "collision_boxes": 1362,
-    "seed": 73,
-    "ocean_instances": 3
-  },
-  "whale": {
-    "triangles": 1268,
-    "vertices": 1900,
-    "unindexed_vertices": 3804,
-    "bytes": 107700,
-    "rig": {
-      "bones": 8,
-      "clips": [
-        "swim"
-      ],
-      "max_influences": 2
-    }
+    "instances": 2018,
+    "ocean_instances": 3,
+    "source_placements": 2032,
+    "collision_boxes": 1391,
+    "seed": 73
   }
 }

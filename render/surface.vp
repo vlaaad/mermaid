@@ -1,0 +1,19 @@
+#version 140
+#include "/render/surface_waves.glsl"
+in highp vec4 position;
+in highp mat4 mtx_world;
+out highp vec3 var_world;
+out highp vec2 var_slope;
+uniform vs_uniforms {
+    highp mat4 mtx_view;
+    highp mat4 mtx_proj;
+    highp vec4 surface_time;
+};
+void main() {
+    vec4 world=mtx_world*position;
+    vec3 wave=surfaceWave(world.xz,surface_time.x);
+    world.y+=wave.x;
+    var_world=world.xyz;
+    var_slope=wave.yz;
+    gl_Position=mtx_proj*mtx_view*world;
+}

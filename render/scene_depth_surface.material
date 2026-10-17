@@ -1,0 +1,8 @@
+name: "scene_depth_surface"
+tags: "shadow"
+vertex_program: "/render/surface.vp"
+fragment_program: "/render/scene_depth.fp"
+vertex_space: VERTEX_SPACE_LOCAL
+vertex_constants { name: "mtx_view" type: CONSTANT_TYPE_VIEW }
+vertex_constants { name: "mtx_proj" type: CONSTANT_TYPE_PROJECTION }
+vertex_constants { name: "surface_time" type: CONSTANT_TYPE_USER value {x:3} }
